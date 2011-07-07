@@ -1,0 +1,20 @@
+EXE_INC = \
+    -I$(LIB_SRC)/finiteVolume/lnInclude \
+    -I$(LIB_SRC)/thermophysicalModels/reactionThermo/lnInclude \
+    -I$(LIB_SRC)/thermophysicalModels/basic/lnInclude \
+    -I$(LIB_SRC)/thermophysicalModels/specie/lnInclude \
+    -I$(LIB_SRC)/thermophysicalModels/functions/Polynomial \
+    -I$(LIB_SRC)/thermophysicalModels/thermophysicalFunctions/lnInclude \
+    -I$(LIB_SRC)/ODE/lnInclude \
+    -I$(LIB_SRC)/turbulenceModels/compressible/lnInclude \
+    -I$(POLIMI_SRC)/compressibleRASModelPolimi\lnInclude \
+    -I$(POLIMI_SRC)/boundaryConditionsEnginePolimi\lnInclude \
+
+LIB_LIBS = \
+    -lbasicThermophysicalModels \
+    -lreactionThermophysicalModels \
+    -lspecie \
+	-lODE \
+    -lthermophysicalFunctions \
+    $(POLIMI_LIBBIN)/libcompressibleRASModelsPolimi.so \
+    $(POLIMI_LIBBIN)/libboundaryConditionsEnginePolimi.so 

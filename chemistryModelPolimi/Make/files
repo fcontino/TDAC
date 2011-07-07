@@ -1,0 +1,20 @@
+chemistryModel/basicChemistryModel/basicChemistryModel.C
+
+chemistryModel/psiTDACChemistryModel/psiTDACChemistryModel.C
+chemistryModel/psiTDACChemistryModel/newPsiTDACChemistryModel.C
+chemistryModel/psiTDACChemistryModel/psiTDACChemistryModels.C
+
+chemistryModel/rhoTDACChemistryModel/rhoTDACChemistryModel.C
+chemistryModel/rhoTDACChemistryModel/newRhoTDACChemistryModel.C
+chemistryModel/rhoTDACChemistryModel/rhoTDACChemistryModels.C
+
+chemistrySolverTDAC/chemistrySolverTDAC/makeChemistrySolversTDAC.C
+
+tab = tabulation
+$(tab)/tabulation/makeTabulations.C
+
+MR = mechanismReduction
+$(MR)/mechanismReduction/makeMechanismReductions.C
+
+
+LIB = $(POLIMI_LIBBIN)/libchemistryModelPolimi
