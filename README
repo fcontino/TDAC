@@ -1,6 +1,6 @@
 The paper describing the theory associated with the TDAC method is
 
-F. Contino, H. Jeanmart, T. Lucchini, and G. D'Errico. Coupling of in situ adaptive tabulation and dy- namic adaptive chemistry: An effective method for solving combustion in engine simulations. Proceedings of the Combustion Institute, 33(2):3057--3064, 2011
+F. Contino, H. Jeanmart, T. Lucchini, and G. D'Errico. Coupling of in situ adaptive tabulation and dynamic adaptive chemistry: An effective method for solving combustion in engine simulations. Proceedings of the Combustion Institute, 33(2):3057--3064, 2011
 doi : 10.1016/j.proci.2010.08.002
 
 To install this library, just copy the directory chemistryModelPolimi anywhere and execute wmake libso.
