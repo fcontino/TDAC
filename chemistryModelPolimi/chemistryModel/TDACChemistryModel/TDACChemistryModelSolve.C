@@ -48,9 +48,7 @@ Description
 template<class CompType, class ThermoType>
 Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar t0, const scalar deltaT)
 {
-	
-	Info << "1" << endl;
-	
+		
     const clockTime clockTime_= clockTime();
     clockTime_.timeIncrement();
 
@@ -69,8 +67,6 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
     );
     label meshSize = rho.size();
 
-	Info << "2" << endl;
-
     scalar deltaTMin = GREAT;
     scalarField Wi(this->nSpecie());
     scalarField invWi(this->nSpecie());
@@ -79,18 +75,15 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
        Wi[j] = this->specieThermo()[j].W();
        invWi[j] = 1.0/this->specieThermo()[j].W();
     }
-	Info << "3" << endl;
 
     tmp<volScalarField> thc = this->thermo().hc();
     const scalarField& hc = thc();
 	
-	Info << "4" << endl;
     //Update the mesh size inside chemistryModel
     label sizeOld = this->deltaTChem_.size();
     scalar minDeltaTChem(min(this->deltaTChem_));
     this->deltaTChem_.setSize(meshSize);
     
-	Info << "5" << endl;
     if(sizeOld < meshSize)//new cells have been added
     {
 		Info << "new size, sizeOld = " << sizeOld << ", meshSize = " << meshSize << endl;
@@ -100,11 +93,10 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
 		}
     }
 
-	Info << "6" << endl;
+
         
     if (!this->chemistry())
     {
-		Info << "!this->chemistry()" << endl;
 		return GREAT;
     }
 	
