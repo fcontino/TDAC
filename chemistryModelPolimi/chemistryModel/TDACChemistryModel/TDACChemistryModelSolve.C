@@ -48,8 +48,6 @@ Description
 template<class CompType, class ThermoType>
 Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar t0, const scalar deltaT)
 {
-	
-	
     const clockTime clockTime_= clockTime();
     clockTime_.timeIncrement();
 
@@ -67,8 +65,7 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
         this->thermo().rho()
     );
     label meshSize = rho.size();
-
-
+    
     scalar deltaTMin = GREAT;
     scalarField Wi(this->nSpecie());
     scalarField invWi(this->nSpecie());
@@ -95,11 +92,10 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
 		}
     }
 
-	Info << "6" << endl;
+
         
     if (!this->chemistry())
     {
-		Info << "!this->chemistry()" << endl;
 		return GREAT;
     }
 	
