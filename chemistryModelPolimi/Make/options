@@ -9,6 +9,7 @@ EXE_INC = \
     -I$(LIB_SRC)/turbulenceModels/compressible/lnInclude \
     -I$(POLIMI_SRC)/compressibleRASModelPolimi\lnInclude \
     -I$(POLIMI_SRC)/boundaryConditionsEnginePolimi\lnInclude \
+    -L$(POLIMI_LIBBIN)
 
 LIB_LIBS = \
     -lbasicThermophysicalModels \
@@ -16,5 +17,5 @@ LIB_LIBS = \
     -lspecie \
 	-lODE \
     -lthermophysicalFunctions \
-    $(POLIMI_LIBBIN)/libcompressibleRASModelsPolimi.so \
-    $(POLIMI_LIBBIN)/libboundaryConditionsEnginePolimi.so 
+    -lcompressibleRASModelsPolimi \
+    -lboundaryConditionsEnginePolimi
