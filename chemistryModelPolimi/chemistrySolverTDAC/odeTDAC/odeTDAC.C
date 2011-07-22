@@ -78,10 +78,8 @@ Foam::scalar Foam::odeTDAC<CompType, ThermoType>::solve
 
     odeSolver_->solve
     (
-        this->model_,
         t0,
         t0 + dt,
-        c1,
         eps_,
         dtEst
     );
