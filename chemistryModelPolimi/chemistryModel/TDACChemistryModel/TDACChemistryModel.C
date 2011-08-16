@@ -31,6 +31,7 @@ License
 #include <sys/time.h>
 #include "Random.H"
 #include "reactingMixture.H"
+#include "OFstream.H"
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -199,7 +200,12 @@ Foam::TDACChemistryModel<CompType, ThermoType>::TDACChemistryModel
         {
             activeSpecies_[i]=true;
         }
-    }    
+    }  
+    OFstream speciesName_(mesh.time().path()+"/speciesName.out");
+    forAll(this->Y(),i)
+    {
+        speciesName_ << i << "    " << this->Y()[i].name() << endl;
+    }
  
 }
 

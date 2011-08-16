@@ -75,8 +75,9 @@ binaryNode<CompType, ThermoType>* node
     DAC_(chemistry.DAC()),
     NsDAC_(chemistry.NsDAC()),
     completeToSimplifiedIndex_(spaceSize-2),
-    simplifiedToCompleteIndex_(NsDAC_)
-	
+    simplifiedToCompleteIndex_(NsDAC_),
+    failedSpeciesFile_(chemistry.thermo().T().mesh().time().path()+"/failedSpecies.out"),
+    failedSpecies_(failedSpeciesFile_.c_str(), ofstream::app)
 {
     epsTol_=epsTol;
     clockTime cpuCP = clockTime();
@@ -120,8 +121,6 @@ binaryNode<CompType, ThermoType>* node
         }
     }
     qrDecompose(dim,Atilde);
-
-
 }
 
 
@@ -149,7 +148,9 @@ chemPointISAT<CompType, ThermoType>::chemPointISAT
     DAC_(p.DAC()),
     NsDAC_(p.NsDAC()),
     completeToSimplifiedIndex_(p.completeToSimplifiedIndex()),
-    simplifiedToCompleteIndex_(p.simplifiedToCompleteIndex())
+    simplifiedToCompleteIndex_(p.simplifiedToCompleteIndex()),
+    failedSpeciesFile_(p.failedSpeciesFile()),
+    failedSpecies_(failedSpeciesFile_.c_str(), ofstream::app)
 {
    epsTol_ = p.epsTol();
 }    
@@ -174,9 +175,19 @@ bool chemPointISAT<CompType, ThermoType>::inEOA(const scalarField& phiq)
     scalarField dphi=phiq-phi();
     label dim = spaceSize()-2;
     if (DAC_) dim = NsDAC_;
+    
+    scalar maxEps=0.0;
+    label maxEpsi=-1;
+    bool writeFailed(true);
+    
     for (register label i=0; i<spaceSize()-2; i++)
     {
         scalar epsTemp=0.0;
+    
+        scalar curEps=0.0;
+        label curSpec=-1;
+        
+        
         //without DAC OR with DAC and on an active species line
         //multiply L by dphi to get the distance in the active species direction
         //else (with DAC and inactive species), just multiply the diagonal element 
@@ -191,22 +202,71 @@ bool chemPointISAT<CompType, ThermoType>::inEOA(const scalarField& phiq)
                 label sj;
                 if(DAC_) sj =simplifiedToCompleteIndex(j);
                 else	sj=j;
-                epsTemp += LTvar[si][j]*dphi[sj];
+                curSpec=sj;
+                curEps=LTvar[si][j]*dphi[sj];
+                epsTemp += curEps;
+                if(curEps > 1.0)
+                {
+                    failedSpecies_<<i<<"    "<<epsTemp << "    " << curSpec<< "    " << curEps<< std::endl;
+                    writeFailed=false;
+                }
             }
-            epsTemp += LTvar[si][NsDAC_]*dphi[spaceSize()-2];
-            epsTemp += LTvar[si][NsDAC_+1]*dphi[spaceSize()-1];
+            curSpec=spaceSize()-2;
+            curEps=LTvar[si][NsDAC_]*dphi[spaceSize()-2];
+            epsTemp += curEps;
+            if(curEps<=1.0)
+            {
+                curSpec=spaceSize()-1;
+                curEps=LTvar[si][NsDAC_+1]*dphi[spaceSize()-1];
+                epsTemp += curEps;
+                if(curEps>1.0)
+                {
+                    failedSpecies_<<i<<"    "<<epsTemp << "    " << curSpec<< "    " << curEps<< std::endl;
+                    writeFailed=false;
+                }
+            }
+            else 
+            {
+                failedSpecies_<<i<<"    "<<epsTemp << "    " << curSpec<< "    " << curEps<< std::endl;
+                writeFailed=false;
+            }
+   
         }
         else
         {
             epsTemp = dphi[i]/(epsTol_*scaleFactor_[i]);
+            if(epsTemp > 1.0)
+            {
+                failedSpecies_<<i<<"    "<<epsTemp << "    " << -1<< "    " << 0<< std::endl;
+                writeFailed=false;
+            }
         }
+
         eps2 += sqr(epsTemp);
+        
+        if(epsTemp > 1.0)
+        {
+            break;
+        }
+        else
+        {
+            if(epsTemp>maxEps)
+            {
+                maxEps= epsTemp;
+                maxEpsi= i;
+            }
+            
+        }
     }
     
     //sqrt(eps2) is not required since it is compared to 1	
     if(eps2 > 1.0)
     {	
+        if(writeFailed)
+            failedSpecies_<<maxEpsi<<"    "<<maxEps << "    -1    0"<< std::endl;
         
+//        failedSpecies_ << std::endl;
+        failedSpecies_.close();
         return false;
     }
     else

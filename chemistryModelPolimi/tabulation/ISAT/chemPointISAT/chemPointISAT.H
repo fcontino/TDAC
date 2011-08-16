@@ -113,6 +113,7 @@ Description
 #include "dictionary.H"
 #include "Switch.H"
 #include "scalarField.H"
+#include "OFstream.H"
 
 
 namespace Foam
@@ -194,6 +195,8 @@ private:
     List<label> completeToSimplifiedIndex_;
     List<label> simplifiedToCompleteIndex_;
     
+    fileName failedSpeciesFile_;
+    ofstream failedSpecies_;
     
     //- Use logarithm of temperature                
     //Switch logT_;
@@ -418,8 +421,10 @@ public:
     {
         return simplifiedToCompleteIndex_[i];
     }
-    
-    
+    inline fileName failedSpeciesFile()
+    {
+        return failedSpeciesFile_;
+    }
     
     // is the point in the ellipsoid of accuracy?
     bool inEOA(const scalarField& phiq);
