@@ -207,6 +207,29 @@ Foam::TDACChemistryModel<CompType, ThermoType>::TDACChemistryModel
         speciesName_ << i << "    " << this->Y()[i].name() << endl;
     }
  
+    if(this->subDict("mechanismReduction").found("fuelSpecies"))
+    {
+        fuelSpecies_ = this->subDict("mechanismReduction").subDict("fuelSpecies").toc();
+    }
+    else 
+    {
+        fuelSpecies_="NC7H16";
+    }
+
+    fuelSpeciesID_.setSize(fuelSpecies_.size());
+    fuelSpeciesID_[0]=0;//in case of no fuel specie specified and no nheptane
+    forAll(fuelSpecies_, i)
+    {
+        for (label j=0; j<this->nSpecie_; j++)
+        {
+            if(this->Y()[j].name() == fuelSpecies_[i])
+            {
+                fuelSpeciesID_[i]=j;
+                break;
+            }
+        }
+    }
+
 }
 
 

@@ -198,6 +198,7 @@ private:
     fileName failedSpeciesFile_;
     ofstream failedSpecies_;
     
+    const Time* refTime_;
     //- Use logarithm of temperature                
     //Switch logT_;
     

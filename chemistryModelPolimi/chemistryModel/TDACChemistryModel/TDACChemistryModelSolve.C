@@ -108,6 +108,20 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
     nFound_ = 0;
     nGrown_  = 0;
 
+/*
+//order the visit to the cells in a specific order
+//the problem if we take always the same order is that the distance to the first stored point will always increase
+//=> for fuel in HCCI, it is better to take increasing order
+//=> for fuel in diesel, it is better to take decreasing order
+
+//-1 identify fuel index in Y
+label fuelIndex(fuelSpeciesID_[0]);
+//-2 sort cell value of Y for the fuel
+//-3 take the sort order in cellIndexTmp
+labelList cellIndexTmp(meshSize);
+sortedOrder(this->Y()[fuelIndex],cellIndexTmp);
+*/
+
     //Random access to mesh cells to avoid problem using ISAT
     labelList cellIndexTmp = identity(meshSize);//cellIndexTmp[i]=i
     Random randGenerator(unsigned(time(NULL)));
@@ -131,7 +145,8 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
     nNsDAC_=0;
     meanNsDAC_=0;
 
-    forAll(rho, ci)
+    for(label ci=0;ci<meshSize; ci++)//increasing order
+//    for(label ci=meshSize-1; ci>=0; ci--)//decreasing order
     {	
         clockTime_.timeIncrement();
         label celli(cellIndexTmp[ci]);

@@ -147,6 +147,9 @@ private:
         
         List<List<chemkinReader::specieElement> > specieComp_;
         
+        wordList fuelSpecies_;
+        List<label> fuelSpeciesID_;
+        
  
     // Private Member Functions
 

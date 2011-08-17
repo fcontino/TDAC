@@ -77,7 +77,8 @@ binaryNode<CompType, ThermoType>* node
     completeToSimplifiedIndex_(spaceSize-2),
     simplifiedToCompleteIndex_(NsDAC_),
     failedSpeciesFile_(chemistry.thermo().T().mesh().time().path()+"/failedSpecies.out"),
-    failedSpecies_(failedSpeciesFile_.c_str(), ofstream::app)
+    failedSpecies_(failedSpeciesFile_.c_str(), ofstream::app),
+    refTime_(&chemistry.thermo().T().mesh().time())
 {
     epsTol_=epsTol;
     clockTime cpuCP = clockTime();
@@ -207,7 +208,7 @@ bool chemPointISAT<CompType, ThermoType>::inEOA(const scalarField& phiq)
                 epsTemp += curEps;
                 if(curEps > 1.0)
                 {
-                    failedSpecies_<<i<<"    "<<epsTemp << "    " << curSpec<< "    " << curEps<< std::endl;
+                    failedSpecies_<<refTime_->timeName() << "    " << i<<"    "<<epsTemp << "    " << curSpec<< "    " << curEps<< std::endl;
                     writeFailed=false;
                 }
             }
@@ -221,23 +222,22 @@ bool chemPointISAT<CompType, ThermoType>::inEOA(const scalarField& phiq)
                 epsTemp += curEps;
                 if(curEps>1.0)
                 {
-                    failedSpecies_<<i<<"    "<<epsTemp << "    " << curSpec<< "    " << curEps<< std::endl;
+                    failedSpecies_<<refTime_->timeName() << "    " << i<<"    "<<epsTemp << "    " << curSpec<< "    " << curEps<< std::endl;
                     writeFailed=false;
                 }
             }
             else 
             {
-                failedSpecies_<<i<<"    "<<epsTemp << "    " << curSpec<< "    " << curEps<< std::endl;
+                failedSpecies_<<refTime_->timeName() << "    " << i<<"    "<<epsTemp << "    " << curSpec<< "    " << curEps<< std::endl;
                 writeFailed=false;
             }
-   
         }
         else
         {
             epsTemp = dphi[i]/(epsTol_*scaleFactor_[i]);
             if(epsTemp > 1.0)
             {
-                failedSpecies_<<i<<"    "<<epsTemp << "    " << -1<< "    " << 0<< std::endl;
+                failedSpecies_<<refTime_->timeName() << "    " << i<<"    "<<epsTemp << "    " << -1<< "    " << 0<< std::endl;
                 writeFailed=false;
             }
         }
@@ -263,10 +263,10 @@ bool chemPointISAT<CompType, ThermoType>::inEOA(const scalarField& phiq)
     if(eps2 > 1.0)
     {	
         if(writeFailed)
-            failedSpecies_<<maxEpsi<<"    "<<maxEps << "    -1    0"<< std::endl;
+        {
+            failedSpecies_<<refTime_->timeName() << "    " << maxEpsi<<"    "<<maxEps << "    -1    0"<< std::endl;
+        }    
         
-//        failedSpecies_ << std::endl;
-        failedSpecies_.close();
         return false;
     }
     else
@@ -275,6 +275,7 @@ bool chemPointISAT<CompType, ThermoType>::inEOA(const scalarField& phiq)
     	{
             nUsed_++;
     	}    
+
         return true;
     }
 }
