@@ -199,6 +199,8 @@ private:
     ofstream failedSpecies_;
     
     const Time* refTime_;
+    
+    label inertSpecie_;
     //- Use logarithm of temperature                
     //Switch logT_;
     

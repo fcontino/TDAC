@@ -279,7 +279,6 @@ void Foam::DRG<CompType,ThermoType>::reduceMechanism
             }
         }
     }//end of loop over reactions
-    
     this->NsSimp_ = speciesNumber;
     scalarField& simplifiedC(this->chemistry_.simplifiedC());
     simplifiedC.setSize(this->NsSimp_+2);
@@ -303,6 +302,7 @@ void Foam::DRG<CompType,ThermoType>::reduceMechanism
             c2s[i] = -1;
         }
     }
+            
     simplifiedC[this->NsSimp_] = T;
     simplifiedC[this->NsSimp_+1] = p;
     this->chemistry_.NsDAC(this->NsSimp_);

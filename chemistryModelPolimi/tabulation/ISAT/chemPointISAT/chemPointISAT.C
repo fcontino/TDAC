@@ -83,6 +83,7 @@ binaryNode<CompType, ThermoType>* node
     epsTol_=epsTol;
     clockTime cpuCP = clockTime();
     cpuCP.timeIncrement();
+    
     if (DAC_)
     {
         for (label i=0; i<spaceSize-2; i++)
@@ -122,6 +123,14 @@ binaryNode<CompType, ThermoType>* node
         }
     }
     qrDecompose(dim,Atilde);
+    word inertSpecieName(chemistry.thermo().lookup("inertSpecie"));
+    forAll(chemistry.Y(),Yi)
+    {
+        if(chemistry.Y()[Yi].name()==inertSpecieName)
+        {
+            inertSpecie_=Yi;
+        }
+    }
 }
 
 
@@ -154,6 +163,7 @@ chemPointISAT<CompType, ThermoType>::chemPointISAT
     failedSpecies_(failedSpeciesFile_.c_str(), ofstream::app)
 {
    epsTol_ = p.epsTol();
+
 }    
 
 /*---------------------------------------------------------------------------*\
@@ -180,15 +190,20 @@ bool chemPointISAT<CompType, ThermoType>::inEOA(const scalarField& phiq)
     scalar maxEps=0.0;
     label maxEpsi=-1;
     bool writeFailed(true);
-    
+
+
     for (register label i=0; i<spaceSize()-2; i++)
     {
+    
+        //skip the inertSpecie
+        if (i==inertSpecie_)
+            continue;
+        
         scalar epsTemp=0.0;
     
         scalar curEps=0.0;
         label curSpec=-1;
-        
-        
+       
         //without DAC OR with DAC and on an active species line
         //multiply L by dphi to get the distance in the active species direction
         //else (with DAC and inactive species), just multiply the diagonal element 
@@ -390,7 +405,7 @@ void chemPointISAT<CompType, ThermoType>::grow(const scalarField& phiq)
         label activeAdded(0);
         for (label i=0; i<spaceSize()-2; i++)
         {
-            if(dphi[i]!=0.0 && completeToSimplifiedIndex(i)==-1)//if previously inactive but dphi!=0
+            if(dphi[i]!=0.0 && completeToSimplifiedIndex(i)==-1 && i!=inertSpecie_)//if previously inactive but dphi!=0 and not inert
             {
                 NsDAC_++;
                 simplifiedToCompleteIndex_.setSize(NsDAC_,i); //add the new active species
