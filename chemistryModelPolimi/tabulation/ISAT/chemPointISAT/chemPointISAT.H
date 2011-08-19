@@ -134,6 +134,8 @@ private:
 	
     //Private data
     
+    //- Pointer to the chemistryModel object
+    TDACChemistryModel<CompType, ThermoType>* chemistry_;
     
     //- Vector storing the composition, temperature and pressure
     scalarField phi_;
@@ -195,10 +197,10 @@ private:
     List<label> completeToSimplifiedIndex_;
     List<label> simplifiedToCompleteIndex_;
     
-    fileName failedSpeciesFile_;
+/*    fileName failedSpeciesFile_;
     ofstream failedSpecies_;
     
-    const Time* refTime_;
+    const Time* refTime_;*/
     
     label inertSpecie_;
     //- Use logarithm of temperature                
@@ -262,7 +264,7 @@ public:
     //- Construct from components
     chemPointISAT
     (
-     const TDACChemistryModel<CompType, ThermoType>& chemistry,
+     TDACChemistryModel<CompType, ThermoType>& chemistry,
      const scalarField& phi,
      const scalarField& Rphi,
      const List<List<scalar> >& A,
@@ -424,11 +426,12 @@ public:
     {
         return simplifiedToCompleteIndex_[i];
     }
+    /*
     inline fileName failedSpeciesFile()
     {
         return failedSpeciesFile_;
     }
-    
+    */
     // is the point in the ellipsoid of accuracy?
     bool inEOA(const scalarField& phiq);
     

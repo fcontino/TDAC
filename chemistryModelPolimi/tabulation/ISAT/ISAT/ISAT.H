@@ -67,7 +67,7 @@ class ISAT
 //        const dictionary& onlineDict_;
         
         //- Reference to the chemistryModel
-        const TDACChemistryModel<CompType, ThermoType>& chemistry_;
+        TDACChemistryModel<CompType, ThermoType>& chemistry_;
 
         //- Generate online lib (on/off)
         //Switch online_;
@@ -127,7 +127,7 @@ public:
         ISAT
         (
             const dictionary& chemistryProperties,
-            const TDACChemistryModel<CompType, ThermoType>& chemistry
+            TDACChemistryModel<CompType, ThermoType>& chemistry
         );
 
 

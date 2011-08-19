@@ -51,7 +51,7 @@ namespace Foam
 template<class CompType, class ThermoType>
 chemPointISAT<CompType, ThermoType>::chemPointISAT
 (
-const TDACChemistryModel<CompType, ThermoType>& chemistry,
+TDACChemistryModel<CompType, ThermoType>& chemistry,
 const scalarField& phi,
 const scalarField& Rphi,
 const List<List<scalar> >& A,
@@ -61,6 +61,7 @@ const label& spaceSize,
 binaryNode<CompType, ThermoType>* node
 )
 :
+    chemistry_(&chemistry),
     phi_(phi),
     Rphi_(Rphi),
     A_(A),
@@ -75,10 +76,10 @@ binaryNode<CompType, ThermoType>* node
     DAC_(chemistry.DAC()),
     NsDAC_(chemistry.NsDAC()),
     completeToSimplifiedIndex_(spaceSize-2),
-    simplifiedToCompleteIndex_(NsDAC_),
+    simplifiedToCompleteIndex_(NsDAC_)/*,
     failedSpeciesFile_(chemistry.thermo().T().mesh().time().path()+"/failedSpecies.out"),
     failedSpecies_(failedSpeciesFile_.c_str(), ofstream::app),
-    refTime_(&chemistry.thermo().T().mesh().time())
+    refTime_(&chemistry.thermo().T().mesh().time())*/
 {
     epsTol_=epsTol;
     clockTime cpuCP = clockTime();
@@ -107,7 +108,6 @@ binaryNode<CompType, ThermoType>* node
     for (register label i=0; i<dim; i++) diag[i]=max(diag[i], 0.5);
     
     //reconstruct Atilde = U*D'*V (ellipsoid in with length d'[i] and principal semi-axes in the direction of the column of )
-    
     for (register label i=0; i<dim-2; i++)
     {
         scalarField AtildeI(dim);
@@ -158,9 +158,9 @@ chemPointISAT<CompType, ThermoType>::chemPointISAT
     DAC_(p.DAC()),
     NsDAC_(p.NsDAC()),
     completeToSimplifiedIndex_(p.completeToSimplifiedIndex()),
-    simplifiedToCompleteIndex_(p.simplifiedToCompleteIndex()),
+    simplifiedToCompleteIndex_(p.simplifiedToCompleteIndex())/*,
     failedSpeciesFile_(p.failedSpeciesFile()),
-    failedSpecies_(failedSpeciesFile_.c_str(), ofstream::app)
+    failedSpecies_(failedSpeciesFile_.c_str(), ofstream::app)*/
 {
    epsTol_ = p.epsTol();
 
@@ -187,11 +187,12 @@ bool chemPointISAT<CompType, ThermoType>::inEOA(const scalarField& phiq)
     label dim = spaceSize()-2;
     if (DAC_) dim = NsDAC_;
     
+    /*
     scalar maxEps=0.0;
     label maxEpsi=-1;
     bool writeFailed(true);
-
-
+    */
+    
     for (register label i=0; i<spaceSize()-2; i++)
     {
     
@@ -200,10 +201,8 @@ bool chemPointISAT<CompType, ThermoType>::inEOA(const scalarField& phiq)
             continue;
         
         scalar epsTemp=0.0;
-    
-        scalar curEps=0.0;
-        label curSpec=-1;
-       
+        scalarList curEps(spaceSize(),0.0);
+      
         //without DAC OR with DAC and on an active species line
         //multiply L by dphi to get the distance in the active species direction
         //else (with DAC and inactive species), just multiply the diagonal element 
@@ -218,51 +217,37 @@ bool chemPointISAT<CompType, ThermoType>::inEOA(const scalarField& phiq)
                 label sj;
                 if(DAC_) sj =simplifiedToCompleteIndex(j);
                 else	sj=j;
-                curSpec=sj;
-                curEps=LTvar[si][j]*dphi[sj];
-                epsTemp += curEps;
-                if(curEps > 1.0)
-                {
-                    failedSpecies_<<refTime_->timeName() << "    " << i<<"    "<<epsTemp << "    " << curSpec<< "    " << curEps<< std::endl;
-                    writeFailed=false;
-                }
+
+                curEps[sj]=LTvar[si][j]*dphi[sj];
+                epsTemp += curEps[sj];
             }
-            curSpec=spaceSize()-2;
-            curEps=LTvar[si][NsDAC_]*dphi[spaceSize()-2];
-            epsTemp += curEps;
-            if(curEps<=1.0)
-            {
-                curSpec=spaceSize()-1;
-                curEps=LTvar[si][NsDAC_+1]*dphi[spaceSize()-1];
-                epsTemp += curEps;
-                if(curEps>1.0)
-                {
-                    failedSpecies_<<refTime_->timeName() << "    " << i<<"    "<<epsTemp << "    " << curSpec<< "    " << curEps<< std::endl;
-                    writeFailed=false;
-                }
-            }
-            else 
-            {
-                failedSpecies_<<refTime_->timeName() << "    " << i<<"    "<<epsTemp << "    " << curSpec<< "    " << curEps<< std::endl;
-                writeFailed=false;
-            }
+            curEps[spaceSize()-2]=LTvar[si][NsDAC_]*dphi[spaceSize()-2];
+            epsTemp += curEps[spaceSize()-2];
+            curEps[spaceSize()-1]=LTvar[si][NsDAC_+1]*dphi[spaceSize()-1];
+            epsTemp += curEps[spaceSize()-1];
         }
         else
         {
             epsTemp = dphi[i]/(epsTol_*scaleFactor_[i]);
-            if(epsTemp > 1.0)
-            {
-                failedSpecies_<<refTime_->timeName() << "    " << i<<"    "<<epsTemp << "    " << -1<< "    " << 0<< std::endl;
-                writeFailed=false;
-            }
+            curEps[i] = epsTemp;
         }
 
         eps2 += sqr(epsTemp);
         
-        if(epsTemp > 1.0)
+        if(fabs(epsTemp) > 1.0)
         {
-            break;
+            chemistry_->addToSpeciesNotInEOA(i); //not in the EOA for the ith species direction in the composition space
+            forAll(curEps,cei)
+            {
+                if(fabs(curEps[cei]) > 1.0)
+                {
+                    chemistry_->addToSpeciesImpact(cei);
+                }
+            }
+            //should break when optimized but to analyze ISAT we'll go to the end
+            //break; 
         }
+        /*
         else
         {
             if(epsTemp>maxEps)
@@ -272,16 +257,12 @@ bool chemPointISAT<CompType, ThermoType>::inEOA(const scalarField& phiq)
             }
             
         }
+        */
     }
     
     //sqrt(eps2) is not required since it is compared to 1	
     if(eps2 > 1.0)
     {	
-        if(writeFailed)
-        {
-            failedSpecies_<<refTime_->timeName() << "    " << maxEpsi<<"    "<<maxEps << "    -1    0"<< std::endl;
-        }    
-        
         return false;
     }
     else

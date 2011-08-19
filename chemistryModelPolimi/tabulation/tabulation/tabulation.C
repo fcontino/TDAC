@@ -36,7 +36,7 @@ template<class CompType, class ThermoType>
 Foam::tabulation<CompType, ThermoType>::tabulation
 (
     const Foam::dictionary& dict,
-    const Foam::TDACChemistryModel<CompType, ThermoType>& chemistry
+    Foam::TDACChemistryModel<CompType, ThermoType>& chemistry
 )
 :
     dict_(dict),

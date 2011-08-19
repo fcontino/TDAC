@@ -60,7 +60,7 @@ class tabulation
 protected:
 
         const dictionary& dict_;
-        const TDACChemistryModel<CompType, ThermoType>& chemistry_;
+        TDACChemistryModel<CompType, ThermoType>& chemistry_;
      	//Dictionary that store the algorithm data
         const dictionary coeffsDict_;
         //Is tabulation active?
@@ -86,7 +86,7 @@ public:
             dictionary,
             (
                 const dictionary& dict,
-                const TDACChemistryModel<CompType, ThermoType>& chemistry
+                TDACChemistryModel<CompType, ThermoType>& chemistry
             ),
             (dict, chemistry)
         );
@@ -98,7 +98,7 @@ public:
         tabulation
         (
             const dictionary& dict,
-            const TDACChemistryModel<CompType, ThermoType>& chemistry
+            TDACChemistryModel<CompType, ThermoType>& chemistry
         );
 
 
@@ -107,7 +107,7 @@ public:
         static autoPtr<tabulation> New
         (
             const dictionary& dict,
-            const TDACChemistryModel<CompType, ThermoType>& chemistry,
+            TDACChemistryModel<CompType, ThermoType>& chemistry,
             const word& compTypeName,
             const word& thermoTypeName
         );

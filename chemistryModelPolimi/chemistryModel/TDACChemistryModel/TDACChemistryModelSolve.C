@@ -51,6 +51,18 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
     const clockTime clockTime_= clockTime();
     clockTime_.timeIncrement();
 
+    //check if the current time falls in a new time bin
+    if(runTime_.value()-previousTime_ > timeBin_)
+    {
+        //a new time bin should be created
+        previousTime_=runTime_.value();
+        curTimeBinIndex_++;
+        speciesNotInEOA_.append(new List<label>(nSpecie_+2,0));
+        speciesImpact_.append(new List<label>(nSpecie_+2,0));
+        notInEOAToGrow_.append(new List<label>(nSpecie_+2,0));
+        notInEOAToAdd_.append(new List<label>(nSpecie_+2,0));        
+    }
+
     const volScalarField rho
     (
         IOobject
@@ -147,7 +159,13 @@ sortedOrder(this->Y()[fuelIndex],cellIndexTmp);
 
     for(label ci=0;ci<meshSize; ci++)//increasing order
 //    for(label ci=meshSize-1; ci>=0; ci--)//decreasing order
-    {	
+    {
+        //autoPtr that stores the list of species that may be involved in grow or add
+        if(!growOrAddImpact_.empty())
+            growOrAddImpact_.clear();
+        if(!growOrAddNotInEOA_.empty())
+            growOrAddNotInEOA_.clear();
+                        
         clockTime_.timeIncrement();
         label celli(cellIndexTmp[ci]);
         
@@ -309,6 +327,14 @@ sortedOrder(this->Y()[fuelIndex],cellIndexTmp);
                 {
 		    addNewLeafCpuTime_ += clockTime_.timeIncrement();
                     nGrown_ ++;
+                    if(!growOrAddImpact_.empty())
+                    {
+                        forAll(growOrAddImpact_(),gi)
+                        {
+                            if(growOrAddImpact_()[gi])
+                                notInEOAToGrow_[curTimeBinIndex_]->operator[](gi)++;
+                        }
+                    }
                 }
                 //ADD if the growth failed, a new leaf is created and added to the binary tree
                 else
@@ -334,6 +360,14 @@ sortedOrder(this->Y()[fuelIndex],cellIndexTmp);
                     //composition space between phi0 and phiq (phi0 contains a reference to the node)
                     tabPtr_->add(phiq, Rphiq, A, phi0, this->nEqns());
                     addNewLeafCpuTime_ += clockTime_.timeIncrement();
+                    if(!growOrAddImpact_.empty())
+                    {
+                        forAll(growOrAddImpact_(),gi)
+                        {
+                            if(growOrAddImpact_()[gi])
+                                notInEOAToAdd_[curTimeBinIndex_]->operator[](gi)++;
+                        }
+                    }
                 }
             }
         }//end if(isISATUsed_)

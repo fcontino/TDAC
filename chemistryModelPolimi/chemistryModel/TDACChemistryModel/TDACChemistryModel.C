@@ -97,7 +97,18 @@ Foam::TDACChemistryModel<CompType, ThermoType>::TDACChemistryModel
     completeToSimplifiedIndex_(this->nSpecie(),-1), //by default it doesn't point to anything
     completeC_(this->nSpecie(),0.0),
     activeSpecies_(this->nSpecie(),false),
-    specieComp_(nSpecie_)
+    specieComp_(nSpecie_),
+    fuelSpecies_(),
+    fuelSpeciesID_(),
+    speciesNotInEOA_(),
+    speciesImpact_(),
+    notInEOAToGrow_(),
+    notInEOAToAdd_(),
+    previousTime_(mesh.time().value()),
+    timeBin_(1e-5),
+    curTimeBinIndex_(0),
+    growOrAddImpact_(),
+    growOrAddNotInEOA_()
 {
 
     // create the fields for the chemistry sources
@@ -229,6 +240,14 @@ Foam::TDACChemistryModel<CompType, ThermoType>::TDACChemistryModel
             }
         }
     }
+    
+    //initialize all variables related to ISAT analysis
+    speciesNotInEOA_.append(new List<label>(nSpecie_+2,0));
+    speciesImpact_.append(new List<label>(nSpecie_+2,0));
+    notInEOAToGrow_.append(new List<label>(nSpecie_+2,0));
+    notInEOAToAdd_.append(new List<label>(nSpecie_+2,0));
+
+    
 
 }
 

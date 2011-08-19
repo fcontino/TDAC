@@ -40,7 +40,7 @@ namespace Foam
 template<class CompType, class ThermoType>
 binaryTree<CompType, ThermoType>::binaryTree
 (
- const TDACChemistryModel<CompType, ThermoType>& chemistry,
+ TDACChemistryModel<CompType, ThermoType>& chemistry,
  label maxElements
 	
 ) 

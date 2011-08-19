@@ -149,6 +149,15 @@ private:
         
         wordList fuelSpecies_;
         List<label> fuelSpeciesID_;
+        DynamicList<labelList*,1,1,1> speciesNotInEOA_;
+        DynamicList<labelList*,1,1,1> speciesImpact_;
+        DynamicList<labelList*,1,1,1> notInEOAToGrow_;
+        DynamicList<labelList*,1,1,1> notInEOAToAdd_;
+        scalar previousTime_;
+        scalar timeBin_;
+        label curTimeBinIndex_;
+        autoPtr<labelList> growOrAddImpact_;  
+        autoPtr<labelList> growOrAddNotInEOA_;
         
  
     // Private Member Functions
@@ -467,6 +476,44 @@ public:
         inline List<List<chemkinReader::specieElement> >& specieComp()
         {
             return specieComp_;
+        }
+        
+        inline void addToSpeciesNotInEOA(label i)
+        {
+            if(growOrAddNotInEOA_.empty())
+                growOrAddNotInEOA_.set(new labelList(nSpecie_+2,0));
+                
+            speciesNotInEOA_[curTimeBinIndex_]->operator[](i)++;
+            growOrAddNotInEOA_()[i]=1;
+        }
+        
+        inline void addToSpeciesImpact(label i)
+        {
+            if(growOrAddImpact_.empty())
+                growOrAddImpact_.set(new labelList(nSpecie_+2,0));
+                        
+            speciesImpact_[curTimeBinIndex_]->operator[](i)++;
+            growOrAddImpact_()[i]=1;            
+        }        
+        
+        inline const DynamicList<labelList*,1,1,1>& speciesNotInEOA()
+        {
+            return speciesNotInEOA_;
+        }
+        
+        inline const DynamicList<labelList*,1,1,1>& speciesImpact()
+        {
+            return speciesImpact_;
+        }
+        
+        inline const DynamicList<labelList*,1,1,1>& notInEOAToGrow()
+        {
+            return notInEOAToGrow_;
+        }
+        
+        inline const DynamicList<labelList*,1,1,1>& notInEOAToAdd()
+        {
+            return notInEOAToAdd_;
         }
         
         //- Update ODE after the solution, advancing by delta

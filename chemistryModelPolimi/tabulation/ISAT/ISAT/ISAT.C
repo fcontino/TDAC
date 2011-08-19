@@ -41,7 +41,7 @@ template<class CompType, class ThermoType>
 Foam::ISAT<CompType, ThermoType>::ISAT
 (
     const dictionary& chemistryProperties,
-    const TDACChemistryModel<CompType, ThermoType>& chemistry
+    TDACChemistryModel<CompType, ThermoType>& chemistry
 )
 :
     tabulation<CompType,ThermoType>(chemistryProperties, chemistry),

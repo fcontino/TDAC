@@ -32,7 +32,7 @@ template<class CompType, class ThermoType>
 Foam::autoPtr<Foam::tabulation<CompType, ThermoType> > Foam::tabulation<CompType, ThermoType>::New
 (
     const dictionary& dict,
-    const TDACChemistryModel<CompType, ThermoType>& chemistry,
+    TDACChemistryModel<CompType, ThermoType>& chemistry,
     const word& compTypeName,
     const word& thermoTypeName
 )

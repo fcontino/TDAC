@@ -69,7 +69,7 @@ private:
 	//Private Data
 	
 	//- Reference to the chemistryModel
-	const TDACChemistryModel<CompType, ThermoType>& chemistry_;	
+	TDACChemistryModel<CompType, ThermoType>& chemistry_;	
         
 	//- Root node of the binary tree
         binaryNode<CompType, ThermoType> *root_;
@@ -112,7 +112,7 @@ public:
        //- Constructors
         
         //- Construct from dictionary and chemistryOnLineLibrary
-        binaryTree(const TDACChemistryModel<CompType, ThermoType>& chemistry,label maxElements);
+        binaryTree( TDACChemistryModel<CompType, ThermoType>& chemistry,label maxElements);
         //binaryTree(label maxElements);
        //- Access
         
