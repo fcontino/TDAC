@@ -119,6 +119,7 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
 
     nFound_ = 0;
     nGrown_  = 0;
+    nFailBTGoodEOA_ = 0;
 
 /*
 //order the visit to the cells in a specific order

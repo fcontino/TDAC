@@ -137,10 +137,39 @@ bool Foam::ISAT<CompType, ThermoType>::retrieve
                 return true;                
             }
         }
-	else
-	{
-	    return false;
+	else if(chemistry_.exhaustiveSearch())
+	{   
+            //exhaustiveSearch if BT search failed
+            forAll(chemisTree_.chemPointISATList(),cPi)
+            {
+                if(chemisTree_.chemPointISATList()[cPi]->inEOA(phiq))
+                {
+                    closest = chemisTree_.chemPointISATList()[cPi];
+                    phi0 = dynamic_cast<chemPointISAT<CompType, ThermoType>*>(closest);
+                    chemistry_.nFailBTGoodEOA()++;
+                    if(phi0->nUsed() > checkUsed()*chemistry_.Y()[0].size())
+                    {
+                        //delete leaf from tree and compact the list of node and chemPoint
+                        chemisTree_.deleteLeafCompact(phi0->listIndex());
+                        closest = NULL;
+                        return false;
+                    }    
+                    else 
+                    {
+                        addToMRU(phi0->listIndex());
+                        return true;                
+                    }
+                }
+            }
+            
+            //if exhaustive search failed, return false
+            return false;
 	}
+        else 
+        {
+            return false;
+        }
+
     }
 }
 

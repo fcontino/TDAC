@@ -237,13 +237,21 @@ bool chemPointISAT<CompType, ThermoType>::inEOA(const scalarField& phiq)
         if(fabs(epsTemp) > 1.0)
         {
             chemistry_->addToSpeciesNotInEOA(i); //not in the EOA for the ith species direction in the composition space
+            scalar maxEps = 1.0;
+            label epsIndex = -1;
             forAll(curEps,cei)
             {
-                if(fabs(curEps[cei]) > 1.0)
+                if(fabs(curEps[cei]) > maxEps)
                 {
-                    chemistry_->addToSpeciesImpact(cei);
+                    maxEps = fabs(curEps[cei]);
+                    epsIndex = cei;
                 }
             }
+            if (epsIndex != -1)
+            {
+                chemistry_->addToSpeciesImpact(epsIndex);
+            }
+                
             //should break when optimized but to analyze ISAT we'll go to the end
             //break; 
         }

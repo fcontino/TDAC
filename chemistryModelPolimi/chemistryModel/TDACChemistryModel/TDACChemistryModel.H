@@ -124,6 +124,9 @@ private:
         
         //- Chem points grown by the library
         label nGrown_;
+        
+        //- Points not found in the first BT search but found by exhaustive search
+        label nFailBTGoodEOA_;
 	
 	//- List of bool to disable reactions
 	Field<bool> reactionsDisabled_;
@@ -160,6 +163,9 @@ private:
         autoPtr<labelList> growOrAddNotInEOA_;
         
  
+        //- Option to perform an exhaustive search in the binary tree
+        Switch exhaustiveSearch_;
+        
     // Private Member Functions
 
 	/*---------------------------------------------------------------------------*\
@@ -461,6 +467,11 @@ public:
         {
             return nGrown_;
         }
+        
+        label& nFailBTGoodEOA()
+        {
+            return nFailBTGoodEOA_;
+        }
 
         label tabSize();
 	label tabDepth();
@@ -514,6 +525,11 @@ public:
         inline const DynamicList<labelList*,1,1,1>& notInEOAToAdd()
         {
             return notInEOAToAdd_;
+        }
+        
+        inline const bool exhaustiveSearch()
+        {
+            return exhaustiveSearch_;
         }
         
         //- Update ODE after the solution, advancing by delta

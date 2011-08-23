@@ -91,6 +91,7 @@ Foam::TDACChemistryModel<CompType, ThermoType>::TDACChemistryModel
     tabPtr_(NULL),
     nFound_(0),
     nGrown_(0),
+    nFailBTGoodEOA_(0),
     reactionsDisabled_(this->nReaction(), false),
     DAC_(false),
     simplifiedToCompleteIndex_(this->nSpecie()),//maximum size of the DynamicList
@@ -108,7 +109,8 @@ Foam::TDACChemistryModel<CompType, ThermoType>::TDACChemistryModel
     timeBin_(1e-5),
     curTimeBinIndex_(0),
     growOrAddImpact_(),
-    growOrAddNotInEOA_()
+    growOrAddNotInEOA_(),
+    exhaustiveSearch_(false)
 {
 
     // create the fields for the chemistry sources
@@ -146,6 +148,7 @@ Foam::TDACChemistryModel<CompType, ThermoType>::TDACChemistryModel
     {
 	tabPtr_ = tabulation<CompType, ThermoType>::New(*this, *this, compTypeName,thermoTypeName);
 	isTabUsed_ = tabPtr_->online();
+        exhaustiveSearch_.readIfPresent("exhaustiveSearch",this->subDict("tabulation"));
     }    
     else
     {
@@ -218,6 +221,7 @@ Foam::TDACChemistryModel<CompType, ThermoType>::TDACChemistryModel
         speciesName_ << i << "    " << this->Y()[i].name() << endl;
     }
  
+    //used if one would like to use the fuel to order the cell visiting order
     if(this->subDict("mechanismReduction").found("fuelSpecies"))
     {
         fuelSpecies_ = this->subDict("mechanismReduction").subDict("fuelSpecies").toc();
@@ -247,7 +251,7 @@ Foam::TDACChemistryModel<CompType, ThermoType>::TDACChemistryModel
     notInEOAToGrow_.append(new List<label>(nSpecie_+2,0));
     notInEOAToAdd_.append(new List<label>(nSpecie_+2,0));
 
-    
+
 
 }
 
