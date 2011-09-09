@@ -58,10 +58,8 @@ Foam::TDACChemistryModel<CompType, ThermoType>::TDACChemistryModel
         dynamic_cast<const reactingMixture<ThermoType>&>
             (this->thermo()).speciesData()
     ),
-
     nSpecie_(Y_.size()),
     nReaction_(reactions_.size()),
-
     solver_
     (
         chemistrySolverTDAC<CompType, ThermoType>::New
@@ -71,7 +69,6 @@ Foam::TDACChemistryModel<CompType, ThermoType>::TDACChemistryModel
             thermoTypeName
         )
     ),
-
     RR_(nSpecie_),
     coeffs_(nSpecie_ + 2),
     runTime_(mesh.time()),
@@ -80,24 +77,27 @@ Foam::TDACChemistryModel<CompType, ThermoType>::TDACChemistryModel
     searchISATCpuTime_(0.0),
     addNewLeafCpuTime_(0.0),
     isTabUsed_(false),
-    
-    NsDAC_(this->nSpecie()), //NsDAC is initialized to nSpecie()
+    NsDAC_(nSpecie_), //NsDAC is initialized to nSpecie()
     nNsDAC_(0),
-    meanNsDAC_(this->nSpecie()),
+    meanNsDAC_(nSpecie_),
     Ntau_(0),
-
     mechRed_(NULL),
-
     tabPtr_(NULL),
     nFound_(0),
     nGrown_(0),
     nFailBTGoodEOA_(0),
+    nCellsVisited_(0),
+    //by default, the solve function will check the tabulation every 1000 time-steps
+    //note: this is an approximation since it use meshSize to allow the use of floating point value
+    checkTab_(this->subDict("tabulation").lookupOrDefault("checkTab",1000)),
+    //by default the size of the maxToComputeList corresponds to a direct treatment of not in EOA points
+    maxToComputeList_(this->subDict("tabulation").lookupOrDefault("maxToComputeList",1)),
     reactionsDisabled_(this->nReaction(), false),
     DAC_(false),
-    simplifiedToCompleteIndex_(this->nSpecie()),//maximum size of the DynamicList
-    completeToSimplifiedIndex_(this->nSpecie(),-1), //by default it doesn't point to anything
-    completeC_(this->nSpecie(),0.0),
-    activeSpecies_(this->nSpecie(),false),
+    simplifiedToCompleteIndex_(nSpecie_),//maximum size of the DynamicList
+    completeToSimplifiedIndex_(nSpecie_,-1), //by default it doesn't point to anything
+    completeC_(nSpecie_,0.0),
+    activeSpecies_(nSpecie_,false),
     specieComp_(nSpecie_),
     fuelSpecies_(),
     fuelSpeciesID_(),
@@ -110,7 +110,9 @@ Foam::TDACChemistryModel<CompType, ThermoType>::TDACChemistryModel
     curTimeBinIndex_(0),
     growOrAddImpact_(),
     growOrAddNotInEOA_(),
-    exhaustiveSearch_(false)
+    analyzeTab_(this->subDict("tabulation").lookupOrDefault("analyzeTab",false)),
+    exhaustiveSearch_(false),
+    nbCellsVisited_(0)
 {
 
     // create the fields for the chemistry sources
@@ -144,6 +146,7 @@ Foam::TDACChemistryModel<CompType, ThermoType>::TDACChemistryModel
             specieComp_[i] = specComp[this->Y()[i].name()];
         }
     }
+
     if(this->found("tabulation"))
     {
 	tabPtr_ = tabulation<CompType, ThermoType>::New(*this, *this, compTypeName,thermoTypeName);
@@ -215,6 +218,7 @@ Foam::TDACChemistryModel<CompType, ThermoType>::TDACChemistryModel
             activeSpecies_[i]=true;
         }
     }  
+
     OFstream speciesName_(mesh.time().path()+"/speciesName.out");
     forAll(this->Y(),i)
     {
@@ -228,7 +232,8 @@ Foam::TDACChemistryModel<CompType, ThermoType>::TDACChemistryModel
     }
     else 
     {
-        fuelSpecies_="NC7H16";
+        fuelSpecies_.setSize(1);
+        fuelSpecies_[0]="NC7H16";
     }
 
     fuelSpeciesID_.setSize(fuelSpecies_.size());
@@ -244,15 +249,15 @@ Foam::TDACChemistryModel<CompType, ThermoType>::TDACChemistryModel
             }
         }
     }
-    
-    //initialize all variables related to ISAT analysis
-    speciesNotInEOA_.append(new List<label>(nSpecie_+2,0));
-    speciesImpact_.append(new List<label>(nSpecie_+2,0));
-    notInEOAToGrow_.append(new List<label>(nSpecie_+2,0));
-    notInEOAToAdd_.append(new List<label>(nSpecie_+2,0));
 
-
-
+    if(analyzeTab_)
+    {
+        //initialize all variables related to ISAT analysis
+        speciesNotInEOA_.append(new List<label>(nSpecie_+2,0));
+        speciesImpact_.append(new List<label>(nSpecie_+2,0));
+        notInEOAToGrow_.append(new List<label>(nSpecie_+2,0));
+        notInEOAToAdd_.append(new List<label>(nSpecie_+2,0));
+    }
 }
 
 
@@ -983,6 +988,11 @@ Foam::label Foam::TDACChemistryModel<CompType, ThermoType>::tabDepth()
     return tabPtr_->depth();
 }
 
+template<class CompType, class ThermoType>
+bool Foam::TDACChemistryModel<CompType, ThermoType>::isActive(label i)
+{
+    return activeSpecies_[i];
+}
 
 
 // ************************************************************************* //

@@ -48,14 +48,6 @@ class binaryNode
 
 public:
 
-	//- Enumeration for whether the position is left or right
-        enum streamAccess
-        {
-            LEFT,
-            RIGHT
-        };
-
-	
         //- Element on the left
         chemPointISAT<CompType, ThermoType>* elementLeft_;
 
@@ -71,15 +63,6 @@ public:
         //- Parent node
         binaryNode<CompType, ThermoType>* parent_;
         
-        //- Depth in the binary tree
-        label depth_;
-        
-        //- Index of the node in the list hold by the binary tree
-        label listIndex_;
-        
-        //- Position according to the parent node
-        //	left: position=0, right: position=1
-        label position_;
 
         /*---------------------------------------------------------------------------*\
 	    'v' and 'a' are used for travelling the node during the binary tree
@@ -135,24 +118,8 @@ public:
         (
             chemPointISAT<CompType, ThermoType>* elementLeft,
             chemPointISAT<CompType, ThermoType>* elementRight,
-            binaryNode<CompType, ThermoType>* left,
-            binaryNode<CompType, ThermoType>* right,
             binaryNode<CompType, ThermoType>* parent
         );
-	binaryNode
-        (
-            chemPointISAT<CompType, ThermoType>*& elementLeft,
-            chemPointISAT<CompType, ThermoType>*& elementRight,
-            binaryNode<CompType, ThermoType>*& parent,
-            label depth
-        );
-        binaryNode
-	(
-	    chemPointISAT<CompType, ThermoType>*& elementLeft,
-	    chemPointISAT<CompType, ThermoType>*& elementRight,
-	    label depth
-	);
-        
         //- Construct from another binary node
         binaryNode
         (
@@ -189,21 +156,6 @@ public:
             return parent_;
         }
 
-	inline label& depth()
-	{
-	    return depth_;
-	}
-		
-	inline label& listIndex()
-	{
-	    return listIndex_;
-	}
-		
-	inline label& position()
-	{
-	    return position_;
-	}
-		
         //- Topology
 
         inline const scalarField& v() const
@@ -211,9 +163,19 @@ public:
             return v_;
         }
 
+        inline scalarField& v()
+        {
+            return v_;
+        }
+        
         inline const scalar& a() const
         {
             return a_;        
+        }
+        
+        inline scalar& a()
+        {
+            return a_;
         }
 
 };

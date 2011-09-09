@@ -46,35 +46,59 @@ Foam::ISAT<CompType, ThermoType>::ISAT
 :
     tabulation<CompType,ThermoType>(chemistryProperties, chemistry),
     chemistry_(chemistry),
-    chemisTree_(chemistry,readLabel(this->coeffsDict_.lookup("maxElements"))),
-    tolerance_(0.0),
+    chemisTree_(chemistry,this->coeffsDict_),
+    tolerance_(readScalar(this->coeffsDict_.lookup("tolerance"))),
     scaleFactor_(chemistry_.Y().size()+2,1.0),
-    logT_(false),
     tauStar_(false),
-    clean_(false),
-    checkUsed_(INT_MAX),
-    checkGrown_(INT_MAX),
-    MRUSize_(0)
-    
+    clean_(this->coeffsDict_.lookupOrDefault("cleanAll", false)),
+    checkUsed_(this->coeffsDict_.lookupOrDefault("checkUsed", INT_MAX)),
+    checkGrown_(this->coeffsDict_.lookupOrDefault("checkGrown", INT_MAX)),
+    MRUSize_(this->coeffsDict_.lookupOrDefault("MRUSize", 0)),
+    cleaningRequired_(false),
+    toRemoveList_(),
+    nFailedFirst_(0),
+    totRetrieve_(0),
+    MRURetrieve_(this->coeffsDict_.lookupOrDefault("MRURetrieve", false)),
+    max2ndRetBalance_(this->coeffsDict_.lookupOrDefault("max2ndRetBalance",1.0)),
+    maxDepthFactor_
+    (
+        this->coeffsDict_.lookupOrDefault
+        (
+            "maxDepthFactor",
+            (chemisTree_.maxElements()-1)/(std::log(chemisTree_.maxElements())/std::log(2.0))
+        )
+    ),
+    runTime_(&chemistry.time()),
+    previousTime_(runTime_->timeToUserTime(runTime_->startTime().value())),
+    checkEntireTreeInterval_
+    (
+        this->coeffsDict_.lookupOrDefault
+        (
+            "checkEntireTreeInterval",
+            (runTime_->endTime().value()-runTime_->startTime().value())/runTime_->deltaT().value()
+        )
+    ),
+    chPMaxLifeTime_
+    (
+        this->coeffsDict_.lookupOrDefault
+        (
+            "chPMaxLifeTime",
+            (runTime_->endTime().value()-runTime_->startTime().value())/runTime_->deltaT().value()
+        )
+    ),
+    chPMaxUseInterval_
+    (
+        this->coeffsDict_.lookupOrDefault
+        (
+            "chPMaxUseInterval",
+            (runTime_->endTime().value()-runTime_->startTime().value())/runTime_->deltaT().value()
+        )
+    )
 {
 
-    tauStar_.readIfPresent("tauStar",this->coeffsDict_); 
-/*    if(this->coeffsDict_.found("tauStar"))
-    {
-        tauStar_ = this->coeffsDict_.lookup("tauStar");
-    }
-  */  
     if(this->online_)
     {
-        tolerance_ = readScalar(this->coeffsDict_.lookup("tolerance"));
-        if (this->coeffsDict_.found("checkUsed")) //if not specified equal to 1000 (most probably not used)
-            checkUsed_ = readScalar(this->coeffsDict_.lookup("checkUsed"));
-        else Info << "checkUsed not specified, set to 1000 by default" << endl;
-        if (this->coeffsDict_.found("checkGrown")) //if not specified equal to 1000 (most probably not used)    
-            checkGrown_ = readLabel(this->coeffsDict_.lookup("checkGrown"));
-        else Info << "checkGrown not specified, set to 1000 by default" << endl;
-        //       logT_ = onlineDict_.lookup("logT");
-        clean_.readIfPresent("cleanAll",this->coeffsDict_);
+        
         dictionary scaleDict(this->coeffsDict_.subDict("scaleFactor"));
         label Ysize = chemistry_.Y().size();
         for(label i = 0; i<Ysize; i++)
@@ -90,9 +114,6 @@ Foam::ISAT<CompType, ThermoType>::ISAT
         } 
         scaleFactor_[Ysize] = readScalar(scaleDict.lookup("Temperature"));    
         scaleFactor_[Ysize+1] = readScalar(scaleDict.lookup("Pressure"));
-        
-        if (this->coeffsDict_.found("MRUSize")) //if not specified, considered as 0 (and not used)
-            MRUSize_ =  readLabel(this->coeffsDict_.lookup("MRUSize"));   
     }
 }
 
@@ -126,51 +147,127 @@ bool Foam::ISAT<CompType, ThermoType>::retrieve
         {	
             if(phi0->nUsed() > checkUsed()*chemistry_.Y()[0].size())
             {
-                //delete leaf from tree and compact the list of node and chemPoint
-                chemisTree_.deleteLeafCompact(phi0->listIndex());
-		closest = NULL;
-		return false;
-            }    
-            else 
-            {
-                addToMRU(phi0->listIndex());
-                return true;                
+                cleaningRequired_ = true;
+                bool inList(false);
+                forAll(toRemoveList_,tRi)
+                {
+                    if(toRemoveList_[tRi]==phi0)
+                    {
+                        inList=true;
+                        break;
+                    }
+                }
+                if(!inList)
+                {
+                    toRemoveList_.append(phi0);
+                }    
             }
+            phi0->lastTimeUsed()=runTime_->timeOutputValue();
+            addToMRU(phi0);
+            totRetrieve_++;
+            return true;                
         }
 	else if(chemistry_.exhaustiveSearch())
 	{   
             //exhaustiveSearch if BT search failed
-            forAll(chemisTree_.chemPointISATList(),cPi)
+            phi0=chemisTree_.treeMin();
+            while(phi0!=NULL)
             {
-                if(chemisTree_.chemPointISATList()[cPi]->inEOA(phiq))
+                if(phi0->inEOA(phiq))
                 {
-                    closest = chemisTree_.chemPointISATList()[cPi];
-                    phi0 = dynamic_cast<chemPointISAT<CompType, ThermoType>*>(closest);
+                    closest = phi0;
                     chemistry_.nFailBTGoodEOA()++;
                     if(phi0->nUsed() > checkUsed()*chemistry_.Y()[0].size())
                     {
-                        //delete leaf from tree and compact the list of node and chemPoint
-                        chemisTree_.deleteLeafCompact(phi0->listIndex());
-                        closest = NULL;
-                        return false;
-                    }    
-                    else 
-                    {
-                        addToMRU(phi0->listIndex());
-                        return true;                
+                        cleaningRequired_ = true;
+                        bool inList(false);
+                        forAll(toRemoveList_,tRi)
+                        {
+                            if(toRemoveList_[tRi]==phi0)
+                            {
+                                inList=true;
+                                break;
+                            }
+                        }
+                        if(!inList)
+                        {
+                            toRemoveList_.append(phi0);
+                        }    
                     }
+                    phi0->lastTimeUsed()=runTime_->timeOutputValue();
+                    addToMRU(phi0);
+                    return true;
                 }
+                phi0=chemisTree_.treeSuccessor(phi0);
             }
-            
             //if exhaustive search failed, return false
             return false;
 	}
-        else 
+        else if(chemisTree_.secondaryBTSearch(phiq, phi0))
         {
-            return false;
+            if(phi0->nUsed() > checkUsed()*chemistry_.Y()[0].size())
+            {
+                cleaningRequired_ = true;
+                bool inList(false);
+                forAll(toRemoveList_,tRi)
+                {
+                    if(toRemoveList_[tRi]==phi0)
+                    {
+                        inList=true;
+                        break;
+                    }
+                }
+                if(!inList)
+                {
+                    toRemoveList_.append(phi0);
+                }    
+            }
+            closest = phi0;
+            chemistry_.nFailBTGoodEOA()++;
+            phi0->lastTimeUsed()=runTime_->timeOutputValue();
+            addToMRU(phi0);
+            nFailedFirst_++;
+            totRetrieve_++;
+            return true;
         }
-
+        else if(MRURetrieve_)
+        {
+            typename SLList<chemPointISAT<CompType, ThermoType>*>::iterator iter = MRUList_.begin();
+            for ( ; iter != MRUList_.end(); ++iter)
+            {
+                phi0=iter();
+                if(phi0->inEOA(phiq))
+                {
+                    chemistry_.nFailBTGoodEOA()++;
+                    if(phi0->nUsed() > checkUsed()*chemistry_.Y()[0].size())
+                    {
+                        cleaningRequired_ = true;
+                        bool inList(false);
+                        forAll(toRemoveList_,tRi)
+                        {
+                            if(toRemoveList_[tRi]==phi0)
+                            {
+                                inList=true;
+                                break;
+                            }
+                        }
+                        if(!inList)
+                        {
+                            toRemoveList_.append(phi0);
+                        }    
+                    }
+                    phi0->lastTimeUsed()=runTime_->timeOutputValue();
+                    addToMRU(phi0);
+                    nFailedFirst_++;
+                    totRetrieve_++;
+                    return true;
+                }
+            }
+        }
+        return false;
     }
+
+
 }
 
 
@@ -196,14 +293,28 @@ bool Foam::ISAT<CompType, ThermoType>::grow
     }
 	
     chemPointISAT<CompType, ThermoType>* phi0 = dynamic_cast<chemPointISAT<CompType, ThermoType>*>(phi0Base);
-    if (phi0->nGrown() > checkGrown())
+
+    
+    if (phi0->checkSolution(phiq,Rphiq))
     {
-        chemisTree_.deleteLeafCompact(phi0->listIndex());
-	phi0Base = NULL;
-	return false;
-    }
-    else if (phi0->checkSolution(phiq,Rphiq))
-    {
+        //phi0 is only grown when checkSolution returns true
+        if (phi0->nGrown() > checkGrown())
+        {
+            cleaningRequired_ = true;
+            bool inList(false);
+            forAll(toRemoveList_,tRi)
+            {
+                if(toRemoveList_[tRi]==phi0)
+                {
+                    inList=true;
+                    break;
+                }
+            }
+            if(!inList)
+            {
+                toRemoveList_.append(phi0);
+            }    
+        }
 	return true;
     }
     else
@@ -292,7 +403,7 @@ void Foam::ISAT<CompType, ThermoType>::calcNewC
 	Output: void
 \*---------------------------------------------------------------------------*/
 template<class CompType, class ThermoType>
-void Foam::ISAT<CompType, ThermoType>::add
+bool Foam::ISAT<CompType, ThermoType>::add
 (
 	const scalarField& phiq,    
 	const scalarField& Rphiq, 
@@ -301,125 +412,50 @@ void Foam::ISAT<CompType, ThermoType>::add
 	const label nCols
 )
 {
-    if(!phi0) add(phiq,Rphiq,A,nCols);
-    else if (chemisTree().isFull())
+    if (chemisTree().isFull())
     {
         if (MRUSize_>0)
         {
-            List<chemPointISAT<CompType, ThermoType>*> tempList(MRUList_.size());
-            List<chemPointISAT<CompType, ThermoType>*>& chemPointISATListTemp = chemisTree().chemPointISATList();
+            List<chemPointISAT<CompType, ThermoType>*> tempList(MRUList_);
             //create a copy of each chemPointISAT of the MRUList_
-            SLList<label>::iterator iter = MRUList_.begin();
-            label j = 0;
-            
-            //the list of chemPoint stored in the binaryTree will be removed
-            //a temporary list is then created to add them back to the tree
-            for ( ; iter != MRUList_.end(); ++iter)
-            {
-                label chemPointISATIndex = iter();
-                /*tempList[j]=new chemPoint(chemPointListTemp[chemPointIndex]->phi(),
-                 chemPointListTemp[chemPointIndex]->Rphi(),
-                 chemPointListTemp[chemPointIndex]->A(),
-                 scaleFactor(),
-                 tolerance(),
-                 nCols	
-                 );
-                 */
-                tempList[j]=new chemPointISAT<CompType, ThermoType>(*chemPointISATListTemp[chemPointISATIndex]);
-                j++;
-                
-            }
             
             chemisTree().clear();
-            chemisTree().insertNewLeaf(phiq, Rphiq, A, scaleFactor(), tolerance(), nCols);
+
+            chemPointISAT<CompType, ThermoType>* nulPhi=0;
+            //insert the point to add first
+            chemisTree().insertNewLeaf(phiq, Rphiq, A, scaleFactor(), tolerance(), nCols,nulPhi);
             
-            for (label i=0; i<tempList.size() ; i++)
+            addToMRU(chemisTree().treeMin());
+            
+            forAll(tempList,i)
             {
-                
-                chemisTree().insertNewLeaf(	tempList[i]->phi(),
-                                           tempList[i]->Rphi(),
-                                           tempList[i]->A(),
-                                           scaleFactor(),
-                                           tolerance(),
-                                           nCols
-                                           );
+                chemisTree().insertNewLeaf
+                (
+                    tempList[i]->phi(),
+                    tempList[i]->Rphi(),
+                    tempList[i]->A(),
+                    scaleFactor(),
+                    tolerance(),
+                    nCols,
+                    nulPhi
+                );
             }
-            
         }
         else
         {
             chemisTree().clear();
-            chemisTree().insertNewLeaf(phiq, Rphiq, A, scaleFactor(), tolerance(), nCols);
+            chemPointISAT<CompType, ThermoType>* nulPhi=0;
+            chemisTree().insertNewLeaf(phiq, Rphiq, A, scaleFactor(), tolerance(), nCols,nulPhi);
         }
-        
-        Info << "depth : " << chemisTree().depth() << endl;
-    }
-    else if (chemisTree().size() ==1)
-    {
-        chemisTree().insertNewLeaf(phiq, Rphiq, A, scaleFactor(), tolerance(), nCols);
+        return true;
     }
     else
     {
         chemPointISAT<CompType, ThermoType>* phi0ISAT = dynamic_cast<chemPointISAT<CompType, ThermoType>*>(phi0);
-        chemisTree().insertNewLeaf(phi0ISAT, phiq, Rphiq, A, scaleFactor(), tolerance(), nCols);
+        chemisTree().insertNewLeaf(phiq, Rphiq, A, scaleFactor(), tolerance(), nCols, phi0ISAT);
         phi0 = phi0ISAT;
+        return false;
     }
-}//end add
-
-/*---------------------------------------------------------------------------*\
-	Add a new leaf to the binary tree 
-	(without reference to an existing chemPoint)
-	Input : phiq the new composition to store
-			Rphiq the mapping of the new composition point
-			A the mapping gradient matrix
-			nCols the size of the matrix
-	Output: void
-\*---------------------------------------------------------------------------*/
-template<class CompType, class ThermoType>
-void Foam::ISAT<CompType, ThermoType>::add
-(
-	const scalarField& phiq,    
-	const scalarField& Rphiq, 
-              List<List<scalar> >& A,
-	const label nCols
-)
-{
-	chemisTree().insertNewLeaf(phiq, Rphiq, A, scaleFactor(), tolerance(), nCols);
-}//end add
-
-	
-/*---------------------------------------------------------------------------*\
-	Replace a new leaf of the binary tree 
-	Input : phi0 the chemPoint to replace in the binary tree
-			phiq the new composition to store
-			Rphiq the mapping of the new composition point
-			A the mapping gradient matrix
-			nCols the size of the matrix
-	Output: void
-	Description: the replacement of a leaf of the binary tree is done in
-			three steps. First the index of the chemPoint in the list hold
-			in the binaryTree class is saved. Then the leaf is deleted and 
-			the tree is reshaped in order to maintain the current splitting
-			of the composition space and allow following binary tree search.
-			Finally the leaf is inserted as usual but its position in the 
-			chemPoint list is specified by the deleted chemPoint.
-			(Note: position in the list and in the binary tree is independant)
-\*---------------------------------------------------------------------------*/
-template<class CompType, class ThermoType>
-void Foam::ISAT<CompType, ThermoType>::replace
-(
-              chemPointBase*& phi0Base,
-	const scalarField& phiq,    
-	const scalarField& Rphiq, 
-              List<List<scalar> >& A,
-	const label nCols
-)
-{
-	chemPointISAT<CompType, ThermoType>* phi0 = dynamic_cast<chemPointISAT<CompType, ThermoType>*>(phi0Base);
-	label phi0Index = phi0->listIndex();
-	label nodeIndex = chemisTree().deleteLeaf(phi0Index);
-
-	chemisTree().insertNewLeaf(phiq, Rphiq, A, scaleFactor(), tolerance(), nCols, nodeIndex, phi0Index);
 }//end add
 
 
@@ -441,49 +477,117 @@ void Foam::ISAT<CompType, ThermoType>::clear()
 	Note : tested with entry of type label			 
 \*---------------------------------------------------------------------------*/
 template<class CompType, class ThermoType>
-void Foam::ISAT<CompType, ThermoType>::addToMRU(label chemPointISATIndex)
+void Foam::ISAT<CompType, ThermoType>::addToMRU(chemPointISAT<CompType, ThermoType>* phi0)
 {
     if (MRUSize_ > 0)
     {
-        //first search if the cp is already in the list
-        bool isInTheTree = false;
-        SLList<label>::iterator iter = MRUList_.begin();
+        //first search if the chemPoint is already in the list
+        bool isInList = false;
+        typename SLList<chemPointISAT<CompType, ThermoType>*>::iterator iter = MRUList_.begin();
         for ( ; iter != MRUList_.end(); ++iter)
         {
-            if(iter()==chemPointISATIndex)
+            if(iter()==phi0)
             {
-                isInTheTree = true;
+                isInList = true;
                 break;
             }
         }
-        //if it is in the tree, then move it to front
-        if (isInTheTree)
+        //if it is in the list, then move it to front
+        if (isInList)
         {
             if (iter()!=MRUList_.last())
             {
                 //iter hold the position of the element to move
-                label toTail = MRUList_.remove(iter);
+                MRUList_.remove(iter);
                 
                 //insert the element in front of the list
-                MRUList_.append(toTail);
+                MRUList_.append(phi0);
             }
         }
-        else //cp not yet in the list
+        else //chemPoint not yet in the list
         {
             if (MRUList_.size()==MRUSize_)
             {	
                 
                 MRUList_.removeHead();
-                MRUList_.append(chemPointISATIndex);
+                MRUList_.append(phi0);
             }
             else
             {
-                MRUList_.append(chemPointISATIndex);
+                MRUList_.append(phi0);
             }
         }
     }
 }
 
+
+template<class CompType, class ThermoType>
+bool Foam::ISAT<CompType, ThermoType>::cleanAndBalance()
+{
+    
+    bool treeModified(false);
+    //1- check if the tree should be cleaned (flag from nUsed or nGrown)
+    if(cleaningRequired_)
+    {
+        cleaningRequired_=false;
+        //2- remove the points that have raised a flag because of number of growth or used 
+        //(they are stored in the toRemoveList)
+        forAll(toRemoveList_,trli)
+        {
+            chemisTree_.deleteLeaf(toRemoveList_[trli]);
+        }
+        toRemoveList_.clear(); //set size to 0, the pointers have been deleted in deleteLeaf function
+        treeModified=true;
+    }
+    
+    //3- check if the entire tree should be scanned (after a given number of time-steps or for other criterion)
+    if
+    (
+        (runTime_->timeOutputValue()-previousTime_)
+        >
+        (checkEntireTreeInterval_*runTime_->timeToUserTime(runTime_->deltaTValue()))
+    )
+    {
+        previousTime_ = runTime_->timeOutputValue();
+        
+        //3a- remove the points that are too old or not used recently
+
+        //scan the entire tree
+        chemPointISAT<CompType, ThermoType>* x = chemisTree_.treeMin();
+        while(x!=NULL)
+        {
+            chemPointISAT<CompType, ThermoType>* xtmp = chemisTree_.treeSuccessor(x);
+            if
+            (
+                ((runTime_->timeOutputValue() - x->timeTag()) > (chPMaxLifeTime_*runTime_->timeToUserTime(runTime_->deltaTValue()))) 
+                || 
+                ((runTime_->timeOutputValue() - x->lastTimeUsed()) > (chPMaxUseInterval_*runTime_->timeToUserTime(runTime_->deltaTValue())))
+            )
+            {
+                chemisTree_.deleteLeaf(x);
+                treeModified=true;
+            }
+            x = xtmp;
+        }
+        //3b- check if the tree should be balanced according to criteria:
+        //      number of secondaryRetrieve above a given threshold (portion of totRetrieve = primary+secondary retrieve)
+        //      depth of the tree bigger than a*log2(size), where a is a given parameter
+        if
+        (
+            (nFailedFirst_ > max2ndRetBalance_*totRetrieve_) 
+            || 
+            (chemisTree_.depth() > maxDepthFactor_*std::log(chemisTree_.size())/std::log(2.0))
+        )
+        {
+            totRetrieve_=0;
+            nFailedFirst_=0;
+            treeModified=chemisTree_.balance();
+        }
+    }
+    
+    //return a bool to specify if the tree structure has been modified
+    return treeModified;
+}
 
 // * * * * * * * * * * * * * * * Member Operators  * * * * * * * * * * * * * //
 

@@ -54,10 +54,19 @@ class chemPointBase
 public:
 
     // Virtual functions 
+        // Destructor
+        virtual ~chemPointBase(){}
 
 	virtual label nGrown() = 0;
 
 	virtual label nUsed() = 0;
+        
+        virtual scalar& lastError() = 0;
+        
+        virtual bool checkError
+        (
+            const scalarField&
+        ) = 0;
 
 	virtual bool checkSolution
         (       

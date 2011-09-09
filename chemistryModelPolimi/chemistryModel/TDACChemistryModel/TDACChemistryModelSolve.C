@@ -30,12 +30,11 @@ Description
 
 #include "TDACChemistryModel.H"
 #include "chemistrySolverTDAC.H"
-//#include "mechanismReduction.H"
-//#include "tabulation.H"
 #include "chemPointBase.H"
 #include <sys/time.h>
 #include "clockTime.H"
 #include "Random.H"
+#include "SortableList.H"
 
 /*---------------------------------------------------------------------------*\
 	Solve function
@@ -52,7 +51,7 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
     clockTime_.timeIncrement();
 
     //check if the current time falls in a new time bin
-    if(runTime_.value()-previousTime_ > timeBin_)
+    if(analyzeTab_ && (runTime_.value()-previousTime_ > timeBin_))
     {
         //a new time bin should be created
         previousTime_=runTime_.value();
@@ -97,48 +96,33 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
     
     if(sizeOld < meshSize)//new cells have been added
     {
-		Info << "new size, sizeOld = " << sizeOld << ", meshSize = " << meshSize << endl;
-		for(label i = sizeOld; i < meshSize; i++)
-		{         
-	    	this->deltaTChem_[i] = minDeltaTChem;    
-		}
+        Info << "new size, sizeOld = " << sizeOld << ", meshSize = " << meshSize << endl;
+        for(label i = sizeOld; i < meshSize; i++)
+        {         
+            this->deltaTChem_[i] = minDeltaTChem;    
+        }
     }
-
-
-        
+    
     if (!this->chemistry())
     {
-		return GREAT;
+        return GREAT;
     }
 	
-	//in case of layering to avoid segmentation fault
+    //in case of layering to avoid segmentation fault
     for(label i=0; i<this->nSpecie(); i++)
     {
-		this->RR()[i].setSize(rho.size());
+        this->RR()[i].setSize(rho.size());
     }
 
     nFound_ = 0;
     nGrown_  = 0;
     nFailBTGoodEOA_ = 0;
 
-/*
-//order the visit to the cells in a specific order
-//the problem if we take always the same order is that the distance to the first stored point will always increase
-//=> for fuel in HCCI, it is better to take increasing order
-//=> for fuel in diesel, it is better to take decreasing order
-
-//-1 identify fuel index in Y
-label fuelIndex(fuelSpeciesID_[0]);
-//-2 sort cell value of Y for the fuel
-//-3 take the sort order in cellIndexTmp
-labelList cellIndexTmp(meshSize);
-sortedOrder(this->Y()[fuelIndex],cellIndexTmp);
-*/
-
-    //Random access to mesh cells to avoid problem using ISAT
+    //Random access to mesh cells to avoid bias and increase probability of better balanced tree in ISAT
     labelList cellIndexTmp = identity(meshSize);//cellIndexTmp[i]=i
     Random randGenerator(unsigned(time(NULL)));
     label j;
+    //shuffle the cellIndexTmp
     for (label i=0; i<meshSize; i++)
     {
     	j=randGenerator.integer(i,meshSize-1);
@@ -147,27 +131,33 @@ sortedOrder(this->Y()[fuelIndex],cellIndexTmp);
         cellIndexTmp[j] = tmp;
     }    
 
-
     //Start loop to solve chemistry in all cells
     reduceMechCpuTime_=0.0;
     addNewLeafCpuTime_=0.0;
     solveChemistryCpuTime_=0.0;
     searchISATCpuTime_=0.0;
-    scalar computeRRTime = 0.0;        
-    scalar loopInit = 0.0;
+    
     nNsDAC_=0;
     meanNsDAC_=0;
 
-    for(label ci=0;ci<meshSize; ci++)//increasing order
-//    for(label ci=meshSize-1; ci>=0; ci--)//decreasing order
+    //Lists that store data for growth and additions
+    DynamicList<label> cellIndexToCompute;
+    DynamicList<chemPointBase*> chPStored;
+    DynamicList<scalar> inEOAError;
+
+
+    /*   *   *   *   *   beginning of the master loop through all cells  *   *   *   */
+    bool computeListFlag(false);
+    for(label ci=0;ci<meshSize; ci++)
     {
-        //autoPtr that stores the list of species that may be involved in grow or add
-        if(!growOrAddImpact_.empty())
-            growOrAddImpact_.clear();
-        if(!growOrAddNotInEOA_.empty())
-            growOrAddNotInEOA_.clear();
-                        
-        clockTime_.timeIncrement();
+        if(analyzeTab_)
+        {
+            if(!growOrAddImpact_.empty())
+                growOrAddImpact_.clear();
+            if(!growOrAddNotInEOA_.empty())
+                growOrAddNotInEOA_.clear();
+        }                
+
         label celli(cellIndexTmp[ci]);
         
         scalar rhoi = rho[celli];
@@ -206,8 +196,6 @@ sortedOrder(this->Y()[fuelIndex],cellIndexTmp);
 
         scalar cTot = 0.0;
 
-	loopInit += clockTime_.timeIncrement();
-
 	/*---------------------------------------------------------------------------*\
             Calculate the mapping of the query composition with the
             ISAT algorithm:
@@ -233,12 +221,16 @@ sortedOrder(this->Y()[fuelIndex],cellIndexTmp);
                 -> a new leaf is added to the tree to store the point phiq,
                 the mapping R(phiq), the mapping gradient matrix A(phiq) and
                 the specification of the ellipsoid of accuracy
+                
+            Note: In this implementation, GROW and ADD are performed when the list
+                  holding the cells to be grown or added reach its user-defined
+                  maximum size.
         \*---------------------------------------------------------------------------*/
+        //phi0 will store the composition of the nearest stored point 
+        chemPointBase *phi0;
 	if(isTabUsed_)
 	{
-	    clockTime_.timeIncrement();		
-	    //phi0 will store the composition of the nearest stored point 
-	    chemPointBase *phi0;
+	    clockTime_.timeIncrement();//init the clock
    
             //The tabulation algorithm try to retrieve the mapping
 	    if (tabPtr_->retrieve(phiq,phi0))
@@ -250,127 +242,46 @@ sortedOrder(this->Y()[fuelIndex],cellIndexTmp);
                 searchISATCpuTime_ += clockTime_.timeIncrement();
                 //Rphiq is in mass fraction, it is converted to molar 
                 //concentration to obtain c (used to compute RR)
-                for (label i=0; i<this->nSpecie(); i++) c[i] = rhoi*Rphiq[i]*invWi[i];
+                for (label i=0; i<this->nSpecie(); i++) 
+                    c[i] = rhoi*Rphiq[i]*invWi[i];
+                
+                updateRR(c0,c,celli,Wi,deltaT);
+                
+                //check if the tree should be cleaned and balanced
+                //(after a given number of time steps, that may be less than 1)
+                nbCellsVisited_++;
+/*                if(nbCellsVisited_ > checkTab_*meshSize)
+                {
+                    nbCellsVisited_=0;
+                    tabPtr_->cleanAndBalance();
+                }                
+                */
             }
-            //Retrieve has failed. The mapping is computed
+            //Retrieve has failed. 
+            //The closest point found, the composition of the query and the error of inEOA
+            //are stored in a list to be processed by decreasing order of error once the 
+            //maximum list size is reached.
             else
             {
                 searchISATCpuTime_ += clockTime_.timeIncrement();
-                //When using mechanism reduction, the mechanism
-                //is reduced before solving the ode including only
-                //the active species
-                if (DAC_) mechRed_->reduceMechanism(c, Ti, pi);
-		reduceMechCpuTime_ += clockTime_.timeIncrement();
-
-		while(timeLeft > SMALL)
-		{
-                    if (DAC_)
-                    {
-                        //The complete set of molar concentration is used even if only active species are updated
-
-                        completeC_ = c;
-
-                        tauC = this->solver().solve(simplifiedC_, Ti, pi, t, dt);
-
-                        for (label i=0; i<NsDAC(); i++)  c[simplifiedToCompleteIndex(i)] = simplifiedC_[i];
-                    }
-                    else
-                    {
-			//Without dynamic reduction, the ode is directly solved
-			//including all the species specified in the mechanism
-
-			//the value of c is updated in the solve function of the chemistrySolverTDAC
-                        tauC = this->solver().solve(c, Ti, pi, t, dt);
-                    }
-		
-                    t += dt;
-			
-	            // update the temperature
-                    cTot = sum(c);
-                        
-        	    ThermoType mixture(0.0*this->specieThermo()[0]);
-                    for(label i=0; i<completeC_.size(); i++)
-                    {
-                        mixture += (c[i]/cTot)*this->specieThermo()[i];
-                    }
-                    Ti = mixture.TH(hi, Ti);
-
-		    timeLeft -= dt;
-                    this->deltaTChem()[celli] = tauC;
-                    dt = min(timeLeft, tauC);
-                    dt = max(dt, SMALL);
-               }
-                if (DAC_) 
-		{
-                    //after solving the number of species should be set back to the total number
-                    nSpecie_ = mechRed_->nSpecie();
-                    nNsDAC_++;
-                    meanNsDAC_+=NsDAC();
-                    //extend the array of active species to the full composition space
-                    for (label i=0; i<NsDAC(); i++)  c[simplifiedToCompleteIndex(i)] = simplifiedC_[i];
-                }
                 
-        	deltaTMin = min(tauC, deltaTMin);
-        	
-                //Rphiq array store the mapping of the query point
-                scalarField Rphiq(this->nSpecie());
-                //Transform c array containing the mapping in molar concentration [mol/m3]
-                //to Rphiq array in mass fraction
-                for(label i=0; i<this->nSpecie(); i++)
+                //add cell index to the list
+                cellIndexToCompute.append(celli);
+                if (phi0!=NULL)
                 {
-                    Rphiq[i] = c[i]/rhoi*Wi[i];
+                    //add the point found to the list
+                    chPStored.append(phi0);
+                    //add the error when inEOA has been called on this chemPoint
+                    inEOAError.append(phi0->lastError());                
                 }
-                solveChemistryCpuTime_ += clockTime_.timeIncrement();
-				
-                //check if the mapping is in the region of accurate linear interpolation
-                //GROW (the grow operation is done in the checkSolution function)
-                if(tabPtr_->grow(phi0, phiq, Rphiq))
-                {
-		    addNewLeafCpuTime_ += clockTime_.timeIncrement();
-                    nGrown_ ++;
-                    if(!growOrAddImpact_.empty())
-                    {
-                        forAll(growOrAddImpact_(),gi)
-                        {
-                            if(growOrAddImpact_()[gi])
-                                notInEOAToGrow_[curTimeBinIndex_]->operator[](gi)++;
-                        }
-                    }
-                }
-                //ADD if the growth failed, a new leaf is created and added to the binary tree
                 else
                 {
-                    //Compute the mapping gradient matrix
-                    //Only computed with an add operation to avoid
-                    //computing it each time
-                    label Asize = this->nEqns();
-                    if (DAC_) Asize = NsDAC_+2;
-                    List<List<scalar> > A(Asize, List<scalar>(Asize,0.0));
-                    scalarField Rcq(this->nEqns());
-                    scalarField cq(this->nSpecie());					
-                    for (label i=0; i<this->nSpecie(); i++)
-                    {
-                        Rcq[i] = rhoi*Rphiq[i]*invWi[i];
-                        cq[i] = rhoi*phiq[i]*invWi[i];
-                    }
-                    Rcq[this->nSpecie()]=Ti;
-                    Rcq[this->nSpecie()+1]=pi;
-                    computeA(A, Rcq, cq, t0, deltaT, Wi, rhoi);
-                    //add the new leaf which will contain phiq, R(phiq) and A(phiq)
-                    //replace the leaf containing phi0 by a node splitting the
-                    //composition space between phi0 and phiq (phi0 contains a reference to the node)
-                    tabPtr_->add(phiq, Rphiq, A, phi0, this->nEqns());
-                    addNewLeafCpuTime_ += clockTime_.timeIncrement();
-                    if(!growOrAddImpact_.empty())
-                    {
-                        forAll(growOrAddImpact_(),gi)
-                        {
-                            if(growOrAddImpact_()[gi])
-                                notInEOAToAdd_[curTimeBinIndex_]->operator[](gi)++;
-                        }
-                    }
+                    computeListFlag=true;
+                    chPStored.append(NULL);
+                    inEOAError.append(GREAT);
                 }
-            }
+            }//end of "retrieve has failed"
+            
         }//end if(isISATUsed_)
         //If ISAT is not used, direct integration is used for every cells
 	else
@@ -383,7 +294,8 @@ sortedOrder(this->Y()[fuelIndex],cellIndexTmp);
                     //the value of c is updated in the solve function of the chemistrySolverTDAC
 		    completeC_ = c;
                     tauC = this->solver().solve(simplifiedC_, Ti, pi, t, dt);
-            	    for (label i=0; i<NsDAC(); i++)  c[simplifiedToCompleteIndex(i)] = simplifiedC_[i];                             
+            	    for (label i=0; i<NsDAC(); i++)  
+                        c[simplifiedToCompleteIndex(i)] = simplifiedC_[i];                             
                 }
                 else
                 {
@@ -418,27 +330,249 @@ sortedOrder(this->Y()[fuelIndex],cellIndexTmp);
                 //extend the array of active species to the full composition space
                 for (label i=0; i<NsDAC(); i++)  c[simplifiedToCompleteIndex(i)] = simplifiedC_[i];
             }
-	    deltaTMin = min(tauC, deltaTMin);        
-        }//end of the part where it computes c after the time step
+	    deltaTMin = min(tauC, deltaTMin);    
+            updateRR(c0,c,celli,Wi,deltaT);    
+        }
         
+        //when the size of the list to compute for growth and addition
+        //is bigger than the maximum allowed size list, perform the addition and growth
+        //when maxToComputeList_ == 1, perform immediately 
+        if
+        (
+            (cellIndexToCompute.size() >= maxToComputeList_) 
+            || 
+            computeListFlag 
+            || 
+            //if we have visited all cells and we did not reach the maximum size allowable
+            ((ci == meshSize-1) && cellIndexToCompute.size()>0)
+        )
+        {
+            computeListFlag=false;
+            //sort the list of errors and start with biggest error
+            SortableList<scalar> inEOAErrorToSort(inEOAError);//sorted in constructor in increasing order
+            labelList iToComp(inEOAErrorToSort.indices());
+            label tcS = iToComp.size();
+            bool treeModified(false);
+            bool cleared(false);//switch to true when the storing structure has been cleared after an addition
+
+            forAll(cellIndexToCompute,agi)
+            {   
+                label tmpCelli=cellIndexToCompute[iToComp[tcS-agi-1]];//start by the end for decreasing order
+                rhoi = rho[tmpCelli];
+                for(label i=0; i<this->nSpecie(); i++)
+                {
+                    phiq[i] = this->Y()[i][tmpCelli];
+                }
+                for(label i=0; i<this->nSpecie(); i++)
+                {
+                    c[i] = rhoi*phiq[i]*invWi[i];
+                }
+                Ti=this->thermo().T()[tmpCelli];
+                pi=this->thermo().p()[tmpCelli];
+                hi=this->thermo().hs()[tmpCelli] + hc[tmpCelli];
+                phiq[this->nSpecie()]=Ti;
+                phiq[this->nSpecie()+1]=pi;
+                
+                //time step and chemical time step
+                t = t0;
+                tauC = this->deltaTChem_[tmpCelli];
+                dt = min(deltaT, tauC);
+                timeLeft = deltaT;
+                
+                //store the initial molar concentration to compute dc=c-c0
+                c0 = c;
+                chemPointBase* phi0 = chPStored[iToComp[tcS-agi-1]];
+                bool retrieved(false);
+                //if the tree has been modified, the retrieve function should be called
+                
+                
+                if(treeModified)
+                {
+                    if(tabPtr_->retrieve(phiq,phi0))
+                    {
+                        nFound_ ++;
+                        retrieved=true;
+                        //Rphiq array store the mapping of the query point
+                        scalarField Rphiq(this->nSpecie());					
+                        tabPtr_->calcNewC(phi0, phiq, Rphiq);
+                        //Rphiq is in mass fraction, it is converted to molar 
+                        //concentration to obtain c (used to compute RR)
+                        for (label i=0; i<this->nSpecie(); i++) 
+                            c[i] = rhoi*Rphiq[i]*invWi[i];
+                    }
+                }
+                //else (if the tree is not modified)
+                //we can use the stored chemPoint to check the error
+                //note : this is performed only if the maxSize is above 1
+                //otherwise, we already know that it is out of bound
+                else if((maxToComputeList_>1) && (phi0!=NULL) && !cleared)//make sure the pointer is valid
+                {                   
+                    if(phi0->checkError(phiq))
+                    {
+                        nFound_++;
+                        retrieved=true;
+                        //Rphiq array store the mapping of the query point
+                        scalarField Rphiq(this->nSpecie());					
+                        tabPtr_->calcNewC(phi0, phiq, Rphiq);
+                        //Rphiq is in mass fraction, it is converted to molar 
+                        //concentration to obtain c (used to compute RR)
+                        for (label i=0; i<this->nSpecie(); i++) 
+                            c[i] = rhoi*Rphiq[i]*invWi[i];
+                    }
+                    
+                }
+                
+                searchISATCpuTime_ += clockTime_.timeIncrement();
+                
+                if(cleared)
+                    phi0=NULL;
+
+                if(!retrieved)
+                {
+                    //When using mechanism reduction, the mechanism
+                    //is reduced before solving the ode including only
+                    //the active species
+                    if (DAC_) mechRed_->reduceMechanism(c, Ti, pi);
+                    reduceMechCpuTime_ += clockTime_.timeIncrement();
+                    
+                    while(timeLeft > SMALL)
+                    {
+                        if (DAC_)
+                        {
+                            //The complete set of molar concentration is used even if only active species are updated                            
+                            completeC_ = c;
+                            tauC = this->solver().solve(simplifiedC_, Ti, pi, t, dt);
+                            for (label i=0; i<NsDAC(); i++)
+                                c[simplifiedToCompleteIndex(i)] = simplifiedC_[i];
+                        }
+                        else
+                        {
+                            //Without dynamic reduction, the ode is directly solved
+                            //including all the species specified in the mechanism
+                            //the value of c is updated in the solve function of the chemistrySolverTDAC
+                            tauC = this->solver().solve(c, Ti, pi, t, dt);
+                        }
+                        
+                        t += dt;
+                        
+                        // update the temperature
+                        cTot = sum(c);
+                        ThermoType mixture(0.0*this->specieThermo()[0]);
+                        for(label i=0; i<completeC_.size(); i++)
+                        {
+                            mixture += (c[i]/cTot)*this->specieThermo()[i];
+                        }
+                        Ti = mixture.TH(hi, Ti);
+                        
+                        timeLeft -= dt;
+                        this->deltaTChem()[tmpCelli] = tauC;
+                        dt = min(timeLeft, tauC);
+                        dt = max(dt, SMALL);
+                    }
+                    if (DAC_) 
+                    {
+                        //after solving the number of species should be set back to the total number
+                        nSpecie_ = mechRed_->nSpecie();
+                        nNsDAC_++;
+                        meanNsDAC_+=NsDAC();
+                        //extend the array of active species to the full composition space
+                        for (label i=0; i<NsDAC(); i++)  
+                            c[simplifiedToCompleteIndex(i)] = simplifiedC_[i];
+                    }
+
+                    deltaTMin = min(tauC, deltaTMin);
+                    
+                    //Rphiq array store the mapping of the query point
+                    scalarField Rphiq(this->nSpecie());
+                    //Transform c array containing the mapping in molar concentration [mol/m3]
+                    //to Rphiq array in mass fraction
+                    for(label i=0; i<this->nSpecie(); i++)
+                    {
+                        Rphiq[i] = c[i]/rhoi*Wi[i];
+                    }
+                    solveChemistryCpuTime_ += clockTime_.timeIncrement();
+                    
+                    //check if the mapping is in the region of accurate linear interpolation
+                    //GROW (the grow operation is done in the checkSolution function)
+                    if(tabPtr_->grow(phi0, phiq, Rphiq))
+                    {
+                        addNewLeafCpuTime_ += clockTime_.timeIncrement();
+                        nGrown_ ++;
+                        if(!growOrAddImpact_.empty() && analyzeTab_)
+                        {
+                            forAll(growOrAddImpact_(),gi)
+                            {
+                                if(growOrAddImpact_()[gi])
+                                    notInEOAToGrow_[curTimeBinIndex_]->operator[](gi)++;
+                            }
+                        }
+                    }
+                    //ADD if the growth failed, a new leaf is created and added to the binary tree
+                    else
+                    {
+  
+                        //Compute the mapping gradient matrix
+                        //Only computed with an add operation 
+                        label Asize = this->nEqns();
+                        if (DAC_) Asize = NsDAC_+2;
+                        List<List<scalar> > A(Asize, List<scalar>(Asize,0.0));
+                        scalarField Rcq(this->nEqns());
+                        scalarField cq(this->nSpecie());					
+                        for (label i=0; i<this->nSpecie(); i++)
+                        {
+                            Rcq[i] = rhoi*Rphiq[i]*invWi[i];
+                            cq[i] = rhoi*phiq[i]*invWi[i];
+                        }
+                        Rcq[this->nSpecie()]=Ti;
+                        Rcq[this->nSpecie()+1]=pi;
+                        computeA(A, Rcq, cq, t0, deltaT, Wi, rhoi);
+                        //add the new leaf which will contain phiq, R(phiq) and A(phiq)
+                        //replace the leaf containing phi0 by a node splitting the
+                        //composition space between phi0 and phiq (phi0 contains a reference to the node)
+                        cleared = (tabPtr_->add(phiq, Rphiq, A, phi0, this->nEqns()) || cleared);
+                        treeModified=true;
+                        addNewLeafCpuTime_ += clockTime_.timeIncrement();
+                        if(!growOrAddImpact_.empty() && analyzeTab_)
+                        {
+                            forAll(growOrAddImpact_(),gi)
+                            {
+                                if(growOrAddImpact_()[gi])
+                                    notInEOAToAdd_[curTimeBinIndex_]->operator[](gi)++;
+                            }
+                        }
+                    }//end of "growth has failed"
+                }
+                updateRR(c0,c,tmpCelli,Wi,deltaT);
+                
+                nbCellsVisited_++;            
+            }//end of loop forAll(cellToCompute)
+
+            //check if the tree should be cleaned and balanced            
+            if(nbCellsVisited_ > checkTab_*meshSize)
+            {
+                nbCellsVisited_=0;
+                tabPtr_->cleanAndBalance();
+            }   
+            
+            //reset the list to compute
+            cellIndexToCompute.clear();
+            chPStored.clear();
+            inEOAError.clear();
+            
+        }//end if size of the list to compute is bigger than max
         
 	clockTime_.timeIncrement();
-	//Compute the rate of reaction according to dc=c-c0
-	//In the CFD solver the following equation is solved:
-	//d(Yi*rho)/dt +convection+diffusion = RR*turbulentCoeff(=1 if not used)
-	//Therefore, the unit of RR should be [kg/(m3.s)]
-        scalarField dc = c - c0;
- 	for(label i=0; i<this->nSpecie(); i++)
-	{
-	     this->RR()[i][celli] = dc[i]*Wi[i]/deltaT;
-	}
-	computeRRTime += clockTime_.timeIncrement();
     }//End of loop over all cells
+    
+    /*   *   *   *   *   end of the master loop through all cells  *   *   *   */
+    
+    
     //Display information about ISAT (if used)
     if(isTabUsed_)
     {
         scalar foundRatio =  (static_cast<scalar> (nFound_))/meshSize;
-	/*Info << "Tabulation found " << foundRatio*100 << "% of the cells in the binary tree" << endl;
+/*
+        Info << "Tabulation found " << foundRatio*100 << "% of the cells in the binary tree" << endl;
 	Info << "Tolerance tabulation = " << tabPtr_->tolerance()<<endl;
 	Info << "Chemistry library size = " ;
 	Info << tabPtr_->size() << endl;
@@ -460,12 +594,30 @@ sortedOrder(this->Y()[fuelIndex],cellIndexTmp);
 
     // Don't allow the time-step to change more than a factor of 2
     deltaTMin = min(deltaTMin, 2*deltaT);
+
     return deltaTMin;
 } //end solve function
 
-
-
-
+//Compute the rate of reaction according to dc=c-c0
+//In the CFD solver the following equation is solved:
+//d(Yi*rho)/dt +convection+diffusion = RR*turbulentCoeff(=1 if not used)
+//Therefore, the unit of RR should be [kg/(m3.s)]
+template<class CompType, class ThermoType>
+void Foam::TDACChemistryModel<CompType, ThermoType>::updateRR
+(
+    const scalarField& c0,
+    const scalarField& c,
+    label tmpCelli,
+    const scalarField& Wi,
+    const scalar deltaT
+)
+{
+    scalarField dc = c - c0;
+    for(label i=0; i<this->nSpecie(); i++)
+    {
+        this->RR()[i][tmpCelli] = dc[i]*Wi[i]/deltaT;
+    }
+}
 
 /*---------------------------------------------------------------------------*\
 	Function to compute the mapping gradient matrix

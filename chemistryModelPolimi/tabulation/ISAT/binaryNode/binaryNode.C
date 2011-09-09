@@ -46,11 +46,7 @@ binaryNode<CompType, ThermoType>::binaryNode
     elementRight_(NULL),
     left_(NULL), 
     right_(NULL),
-    parent_(NULL),
-    depth_(0),
-    listIndex_(-1),
-    //default position left
-    position_(binaryNode<CompType, ThermoType>::LEFT)
+    parent_(NULL)
 {}
 
 
@@ -59,68 +55,14 @@ binaryNode<CompType, ThermoType>::binaryNode
 (
     chemPointISAT<CompType, ThermoType>* elementLeft,
     chemPointISAT<CompType, ThermoType>* elementRight,
-    binaryNode<CompType, ThermoType>* left,
-    binaryNode<CompType, ThermoType>* right,
     binaryNode<CompType, ThermoType>* parent
 )
 :
     elementLeft_(elementLeft),
     elementRight_(elementRight),
-    left_(left), 
-    right_(right),
-    parent_(parent),
-    depth_(0),
-    listIndex_(-1),
-    //default position left
-    position_(binaryNode::LEFT),
-    v_(elementLeft->spaceSize(),0.0)
-
-{
-	calcV(elementLeft, elementRight, v_);
-	a_ = calcA(elementLeft, elementRight);
-}
-
-template<class CompType, class ThermoType>
-binaryNode<CompType, ThermoType>::binaryNode
-(
-    chemPointISAT<CompType, ThermoType>*& elementLeft,
-    chemPointISAT<CompType, ThermoType>*& elementRight,
-    binaryNode<CompType, ThermoType>*& parent,
-    label depth
-)
-:
-    elementLeft_(elementLeft),
-    elementRight_(elementRight),
     left_(NULL), 
     right_(NULL),
     parent_(parent),
-    depth_(depth),
-    listIndex_(-1),
-    //default position left
-    position_(binaryNode<CompType, ThermoType>::LEFT),
-    v_(elementLeft->spaceSize(),0.0)
-{
-	calcV(elementLeft, elementRight, v_);
-	a_ = calcA(elementLeft, elementRight);
-}
-
-template<class CompType, class ThermoType>
-binaryNode<CompType, ThermoType>::binaryNode
-(
-    chemPointISAT<CompType, ThermoType>*& elementLeft,
-    chemPointISAT<CompType, ThermoType>*& elementRight,
-    label depth
-)
-:
-    elementLeft_(elementLeft),
-    elementRight_(elementRight),
-    left_(NULL), 
-    right_(NULL),
-    parent_(NULL),
-    depth_(depth),
-    listIndex_(-1),
-    //default position left
-    position_(binaryNode::LEFT),
     v_(elementLeft->spaceSize(),0.0)
 {
 	calcV(elementLeft, elementRight, v_);
@@ -138,9 +80,6 @@ binaryNode<CompType, ThermoType>::binaryNode
     left_(bn->left()), 
     right_(bn->right()),
     parent_(bn->parent()),
-    depth_(bn->depth()),
-    listIndex_(bn->listIndex()),
-    position_(bn->position()),
     v_(bn->v()),
     a_(bn->a())
 {}
@@ -168,7 +107,9 @@ binaryNode<CompType, ThermoType>::binaryNode
 		v = -------------------- .
 			||L.L^T (phiq-phi0)||
 			
-	Note : v is not normalised in this implementation
+	Note :  v is not normalised in this implementation since it is used
+                on both side of an equality to know if one should go on the
+                left or the right in the binary tree
     Input : elementLeft : chemPoint of the left element
 	    elementRight: chemPoint of the right element
 	    v		: empty scalar field to store v

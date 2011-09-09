@@ -68,15 +68,16 @@ binaryNode<CompType, ThermoType>* node
     scaleFactor_(scaleFactor),
     node_(node),
     spaceSize_(spaceSize),
-    //by default position is left
-    position_(binaryNode<CompType, ThermoType>::LEFT),
-    nUsed_(0),
+     nUsed_(0),
     nGrown_(0),    
-    listIndex_(-1), 
     DAC_(chemistry.DAC()),
     NsDAC_(chemistry.NsDAC()),
     completeToSimplifiedIndex_(spaceSize-2),
-    simplifiedToCompleteIndex_(NsDAC_)/*,
+    simplifiedToCompleteIndex_(NsDAC_),
+    inertSpecie_(-1),
+    timeTag_(chemistry_->time().timeOutputValue()),
+    lastTimeUsed_(chemistry_->time().timeOutputValue()),
+    lastError_(0.0)/*,
     failedSpeciesFile_(chemistry.thermo().T().mesh().time().path()+"/failedSpecies.out"),
     failedSpecies_(failedSpeciesFile_.c_str(), ofstream::app),
     refTime_(&chemistry.thermo().T().mesh().time())*/
@@ -150,15 +151,16 @@ chemPointISAT<CompType, ThermoType>::chemPointISAT
     scaleFactor_(p.scaleFactor()),
     node_(p.node()),
     spaceSize_(p.spaceSize()),
-    position_(p.position()),
     nUsed_(p.nUsed()),
     nGrown_(p.nGrown()),
     //epsTol_(p.epsTol()),
-    listIndex_(p.listIndex()),
     DAC_(p.DAC()),
     NsDAC_(p.NsDAC()),
     completeToSimplifiedIndex_(p.completeToSimplifiedIndex()),
-    simplifiedToCompleteIndex_(p.simplifiedToCompleteIndex())/*,
+    simplifiedToCompleteIndex_(p.simplifiedToCompleteIndex()),
+    inertSpecie_(p.inertspecie()),
+    timeTag_(p.timeTag()),
+    lastTimeUsed_(p.lastTimeUsed())/*,
     failedSpeciesFile_(p.failedSpeciesFile()),
     failedSpecies_(failedSpeciesFile_.c_str(), ofstream::app)*/
 {
@@ -181,21 +183,14 @@ chemPointISAT<CompType, ThermoType>::chemPointISAT
 template<class CompType, class ThermoType>
 bool chemPointISAT<CompType, ThermoType>::inEOA(const scalarField& phiq)
 {
-    scalar eps2=0.0;
+    lastError_=0.0;
     const List<List<scalar> >& LTvar = LT();
     scalarField dphi=phiq-phi();
     label dim = spaceSize()-2;
     if (DAC_) dim = NsDAC_;
     
-    /*
-    scalar maxEps=0.0;
-    label maxEpsi=-1;
-    bool writeFailed(true);
-    */
-    
     for (register label i=0; i<spaceSize()-2; i++)
     {
-    
         //skip the inertSpecie
         if (i==inertSpecie_)
             continue;
@@ -232,44 +227,40 @@ bool chemPointISAT<CompType, ThermoType>::inEOA(const scalarField& phiq)
             curEps[i] = epsTemp;
         }
 
-        eps2 += sqr(epsTemp);
+        lastError_ += sqr(epsTemp);
         
         if(fabs(epsTemp) > 1.0)
         {
-            chemistry_->addToSpeciesNotInEOA(i); //not in the EOA for the ith species direction in the composition space
-            scalar maxEps = 1.0;
-            label epsIndex = -1;
-            forAll(curEps,cei)
+            if(chemistry_->analyzeTab())
             {
-                if(fabs(curEps[cei]) > maxEps)
+                chemistry_->addToSpeciesNotInEOA(i); //not in the EOA for the ith species direction in the composition space
+                scalar maxEps = 1.0;
+                label epsIndex = -1;
+                forAll(curEps,cei)
                 {
-                    maxEps = fabs(curEps[cei]);
-                    epsIndex = cei;
+                    if(fabs(curEps[cei]) > maxEps)
+                    {
+                        maxEps = fabs(curEps[cei]);
+                        epsIndex = cei;
+                    }
                 }
-            }
-            if (epsIndex != -1)
-            {
-                chemistry_->addToSpeciesImpact(epsIndex);
-            }
-                
-            //should break when optimized but to analyze ISAT we'll go to the end
-            //break; 
+                if (epsIndex != -1)
+                {
+                    chemistry_->addToSpeciesImpact(epsIndex);
+                }
+            }   
+            //should break when optimized but to analyze ISAT we need to go to the end
+            break; 
         }
-        /*
-        else
+        else if(lastError_ > 1.0)
         {
-            if(epsTemp>maxEps)
-            {
-                maxEps= epsTemp;
-                maxEpsi= i;
-            }
-            
+            //the error can only grow, therefore, once it is above 1.0, we can stop the loop
+            break;
         }
-        */
     }
     
     //sqrt(eps2) is not required since it is compared to 1	
-    if(eps2 > 1.0)
+    if(lastError_ > 1.0)
     {	
         return false;
     }
@@ -419,6 +410,7 @@ void chemPointISAT<CompType, ThermoType>::grow(const scalarField& phiq)
             
             for (label i=0; i<NsDAC_-activeAdded; i++)
             {
+                //star with last column, otherwise problems when activeAdded=1
                 for (label j=1; j>=0; j--)
                 {
                     LTvar[i][NsDAC_+j]=LTvar[i][NsDAC_+j-activeAdded];
@@ -480,7 +472,6 @@ void chemPointISAT<CompType, ThermoType>::grow(const scalarField& phiq)
             v[i] += phiTilde[j]*LTvar[j][i];
     }
     
-    
     qrUpdate(dim, u, v);
 }
 
@@ -503,7 +494,6 @@ void chemPointISAT<CompType, ThermoType>::clearData()
     LT_.clear();        
     A_.clear();
     epsTol_ = 0;
-    position_ = binaryNode<CompType, ThermoType>::LEFT;
 }
 
 

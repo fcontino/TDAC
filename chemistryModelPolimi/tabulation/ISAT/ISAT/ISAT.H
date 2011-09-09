@@ -45,6 +45,7 @@ Description
 #include "Switch.H"
 #include "scalarField.H"
 #include "binaryTree.H" 
+#include "Time.H"
 
 namespace Foam
 {
@@ -65,12 +66,10 @@ class ISAT
    
 //        //- Dictionary for data lookup
 //        const dictionary& onlineDict_;
-        
+
+private:
         //- Reference to the chemistryModel
         TDACChemistryModel<CompType, ThermoType>& chemistry_;
-
-        //- Generate online lib (on/off)
-        //Switch online_;
 
         //- List of the stored 'points' organized in a binary tree
         binaryTree<CompType, ThermoType> chemisTree_;
@@ -81,9 +80,6 @@ class ISAT
         //- List of scale factors for species, temperature and pressure
         scalarField scaleFactor_;
        
-        //- how to deal with temperature
-        Switch logT_;
-        
         //- how to deal with time
         Switch tauStar_;
         
@@ -97,11 +93,35 @@ class ISAT
         label checkGrown_; 
         
         //- Most Recently Used (MRU) list of chemPoint
-        SLList<label> MRUList_;
+        SLList<chemPointISAT<CompType, ThermoType>*> MRUList_;
         
         //- User defined size of the MRU list
 	label MRUSize_;
-		           
+        
+        //- Variable that raise a flag when a cleaning operation is required
+        bool cleaningRequired_;
+        
+        DynamicList<chemPointISAT<CompType, ThermoType>*> toRemoveList_;
+
+        //- Number of points failed to be found by primary retrieve
+        //  but found by either secondary retrieve or in the MRU list
+        label nFailedFirst_;
+        label totRetrieve_;
+        
+        //- After a failed primary retrieve, loo in the MRU list
+        bool MRURetrieve_;
+        
+        //- Max proportion of the retrieve done by secondary retrieve before calling balance function
+        scalar max2ndRetBalance_;
+        scalar maxDepthFactor_;
+        
+        const Time* runTime_;
+        scalar previousTime_;
+        scalar checkEntireTreeInterval_;
+        label chPMaxLifeTime_;
+        label chPMaxUseInterval_;
+        
+        
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
@@ -111,7 +131,7 @@ class ISAT
         void operator=(const ISAT&);
         
         //- Add to MRUList
-        void addToMRU(label chemPointISATIndex);
+        void addToMRU(chemPointISAT<CompType, ThermoType>* phi0);
 		
 	
 
@@ -180,13 +200,17 @@ public:
         {
             return checkGrown_;
         }
-        
 
 	//- Return the depth of the binary tree
 	inline label depth()
 	{
 	    return chemisTree_.depth();
 	}
+        
+        inline bool& cleaningRequired()
+        {
+            return cleaningRequired_;
+        }
         
         // Edit
 				
@@ -201,60 +225,14 @@ public:
                                 nCols the size of the matrix
                 Output: void
         \*---------------------------------------------------------------------------*/
-        void add
+        bool add
         (
                 const scalarField& phiq,    
                 const scalarField& Rphiq, 
-                          List<List<scalar> >& A,
+                      List<List<scalar> >& A,
                       chemPointBase*& phi0,
                 label nCols
         );
-        
-        /*---------------------------------------------------------------------------*\
-                Add a new leaf to the binary tree 
-                (without reference to an existing chemPoint)
-                Input : phiq the new composition to store
-                                Rphiq the mapping of the new composition point
-                                A the mapping gradient matrix
-                                nCols the size of the matrix
-                Output: void
-        \*---------------------------------------------------------------------------*/
-        void add
-        (
-                const scalarField& phiq,    
-                const scalarField& Rphiq, 
-                          List<List<scalar> >& A,
-                label nCols
-        );
-
-        
-        /*---------------------------------------------------------------------------*\
-	    Replace a new leaf of the binary tree 
-	    Input : phi0 the chemPoint to replace in the binary tree
-		phiq the new composition to store
-		Rphiq the mapping of the new composition point
-		A the mapping gradient matrix
-		nCols the size of the matrix
-	    Output: void
-	    Description: the replacement of a leaf of the binary tree is done in
-		three steps. First the index of the chemPoint in the list hold
-		in the binaryTree class is saved. Then the leaf is deleted and 
-		the tree is reshaped in order to maintain the current splitting
-		of the composition space and allow following binary tree search.
-		Finally the leaf is inserted as usual but its position in the 
-		chemPoint list is specified by the deleted chemPoint.
-	    (Note: position in the list and in the binary tree is independant)
-	\*---------------------------------------------------------------------------*/
-	
-	void replace
-	(
-		  chemPointBase*& phi0,
-	    const scalarField& phiq,    
-	    const scalarField& Rphiq, 
-		  List<List<scalar> >& A,
-	    const label nCols
-	);       
-
         
         /*---------------------------------------------------------------------------*\
             Compute and return the mapping of the composition phiq from stored data
@@ -298,14 +276,12 @@ public:
 	bool retrieve 
 	(
 	    const Foam::scalarField& v0,
-		      chemPointBase*& closest
+                  chemPointBase*& closest
 	);
-
         
-        // IOstream Operators
-
-   //     friend Istream& operator>> <CompType, ThermoType>(Istream&, ISAT<CompType, ThermoType>&);
-   //     friend Ostream& operator<< <CompType, ThermoType>(Ostream&, const ISAT<CompType, ThermoType>&);
+        
+        //- Clean and balance the tree if needed
+        bool cleanAndBalance();
 };
 
 

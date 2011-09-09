@@ -127,7 +127,14 @@ private:
         
         //- Points not found in the first BT search but found by exhaustive search
         label nFailBTGoodEOA_;
+        
+        //- Number of cells that have been visited
+        label nCellsVisited_;
+        scalar checkTab_;
 	
+        //- Maximum size of the list to be processed for grow and add
+        label maxToComputeList_;
+        
 	//- List of bool to disable reactions
 	Field<bool> reactionsDisabled_;
 		
@@ -161,10 +168,13 @@ private:
         label curTimeBinIndex_;
         autoPtr<labelList> growOrAddImpact_;  
         autoPtr<labelList> growOrAddNotInEOA_;
+        bool analyzeTab_;
         
  
         //- Option to perform an exhaustive search in the binary tree
         Switch exhaustiveSearch_;
+        
+        label nbCellsVisited_;
         
     // Private Member Functions
 
@@ -220,6 +230,17 @@ private:
             const scalarField& c,
             List<List<scalar> >& dfdc
         ) const;
+        
+
+        void updateRR
+        (
+            const scalarField& c0,
+            const scalarField& c,
+            label tmpCelli,
+            const scalarField& Wi,
+            const scalar deltaT
+        );
+
 		
         //- Disallow default bitwise assignment
         void operator=(const TDACChemistryModel<CompType, ThermoType>&);
@@ -264,9 +285,11 @@ public:
         inline const PtrList<ThermoType>& specieThermo() const;
 
         //- The number of species
-        inline label nSpecie() const;
-        
         label& nSpecie()
+        {
+            return nSpecie_;
+        }
+        inline const label& nSpecie() const
         {
             return nSpecie_;
         }
@@ -405,29 +428,29 @@ public:
         // Chemistry model functions (overriding abstract functions in
         // basicChemistryModel.H)
 
-            //- Return const access to the chemical source terms
-            inline tmp<volScalarField> RR(const label i) const;
+        //- Return const access to the chemical source terms
+        inline tmp<volScalarField> RR(const label i) const;
 
-            //- Return the chemical time scale
-            virtual tmp<volScalarField> tc() const;
+        //- Return the chemical time scale
+        virtual tmp<volScalarField> tc() const;
 
-            //- Return source for enthalpy equation [kg/m/s3]
-            virtual tmp<volScalarField> Sh() const;
+        //- Return source for enthalpy equation [kg/m/s3]
+        virtual tmp<volScalarField> Sh() const;
 
-            //- Return the heat release, i.e. enthalpy/sec [m2/s3]
-            virtual tmp<volScalarField> dQ() const;
+        //- Return the heat release, i.e. enthalpy/sec [m2/s3]
+        virtual tmp<volScalarField> dQ() const;
 
 
         // ODE functions (overriding abstract functions in ODE.H)
 
-            //- Number of ODE's to solve
-            virtual label nEqns() const;
+        //- Number of ODE's to solve
+        virtual label nEqns() const;
 
-            //- Return access to coefficients
-            virtual scalarField& coeffs();
+        //- Return access to coefficients
+        virtual scalarField& coeffs();
 
-            //- Return reference to coefficients
-            virtual const scalarField& coeffs() const;
+        //- Return reference to coefficients
+        virtual const scalarField& coeffs() const;
                 
                         	
         virtual void derivatives
@@ -458,17 +481,17 @@ public:
             const scalar deltaT
         );
 
-        const label& nFound() const
+        inline const label& nFound() const
         {
             return nFound_;
         }
         
-        const label& nGrown() const
+        inline const label& nGrown() const
         {
             return nGrown_;
         }
         
-        label& nFailBTGoodEOA()
+        inline label& nFailBTGoodEOA()
         {
             return nFailBTGoodEOA_;
         }
@@ -479,32 +502,41 @@ public:
 	//set species Y[i] to active
 	void setActive(label i);
 	
-	inline bool isActive(label i)
-	{
-	    return activeSpecies_[i];
-	}
+	bool isActive(label i);
+
 
         inline List<List<chemkinReader::specieElement> >& specieComp()
         {
             return specieComp_;
         }
         
+        inline bool analyzeTab()
+        {
+            return analyzeTab_;
+        }
+        
         inline void addToSpeciesNotInEOA(label i)
         {
-            if(growOrAddNotInEOA_.empty())
-                growOrAddNotInEOA_.set(new labelList(nSpecie_+2,0));
+            if(analyzeTab_)
+            {
+                if(growOrAddNotInEOA_.empty())
+                    growOrAddNotInEOA_.set(new labelList(nSpecie_+2,0));
                 
-            speciesNotInEOA_[curTimeBinIndex_]->operator[](i)++;
-            growOrAddNotInEOA_()[i]=1;
+                speciesNotInEOA_[curTimeBinIndex_]->operator[](i)++;
+                growOrAddNotInEOA_()[i]=1;
+            }
         }
         
         inline void addToSpeciesImpact(label i)
         {
-            if(growOrAddImpact_.empty())
-                growOrAddImpact_.set(new labelList(nSpecie_+2,0));
-                        
-            speciesImpact_[curTimeBinIndex_]->operator[](i)++;
-            growOrAddImpact_()[i]=1;            
+            if(analyzeTab_)
+            {
+                if(growOrAddImpact_.empty())
+                    growOrAddImpact_.set(new labelList(nSpecie_+2,0));
+                
+                speciesImpact_[curTimeBinIndex_]->operator[](i)++;
+                growOrAddImpact_()[i]=1;            
+            }
         }        
         
         inline const DynamicList<labelList*,1,1,1>& speciesNotInEOA()
@@ -531,7 +563,8 @@ public:
         {
             return exhaustiveSearch_;
         }
-        
+             
+                 
         //- Update ODE after the solution, advancing by delta
         virtual void update(const scalar delta)
         {}

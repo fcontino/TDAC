@@ -63,14 +63,6 @@ Foam::TDACChemistryModel<CompType, ThermoType>::specieThermo() const
 
 template<class CompType, class ThermoType>
 inline Foam::label
-Foam::TDACChemistryModel<CompType, ThermoType>::nSpecie() const
-{
-    return nSpecie_;
-}
-
-
-template<class CompType, class ThermoType>
-inline Foam::label
 Foam::TDACChemistryModel<CompType, ThermoType>::nReaction() const
 {
     return nReaction_;

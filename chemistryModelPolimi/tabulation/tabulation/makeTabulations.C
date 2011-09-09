@@ -47,7 +47,7 @@ namespace Foam
    
     makeTabulation(rhoTDACChemistryModel, icoPoly8ThermoPhysics)
     makeTabulationType(ISAT, rhoTDACChemistryModel, icoPoly8ThermoPhysics)
-    }
+}
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

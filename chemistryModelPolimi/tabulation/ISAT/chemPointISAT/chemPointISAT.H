@@ -150,15 +150,16 @@ private:
     //- QT the matrix obtained during QR decomposition (used to update LT after a grow)
     List<List<scalar> > QT_;        
     
-    
     //- A the mapping gradient matrix
     List<List<scalar> >A_;
     
+    /*
     //- The minimum length of the principal semi-axes
-    scalar	rmin_;
+    scalar rmin_;
     
     //- The maximum length of the principal semi-axes
     scalar rmax_;
+    */
     
     //- Vector storing the scale factor
     scalarField scaleFactor_;        
@@ -169,10 +170,6 @@ private:
     //- The size of the composition space (size of the vector phi)
     label spaceSize_;
     
-    //- The position of the chemPoint according of the node
-    //	left: position=0, right: position=1
-    label position_;
-    
     //- Number of times the element has been used
     label nUsed_;
     
@@ -181,9 +178,6 @@ private:
     
     //- Tolerance for the Ellipsoid of accuracy
     static scalar epsTol_;
-    
-    //- Index in the list of chemPoint hold by the binary tree
-    label listIndex_;
     
     //- Variables related to DAC
     //Switch to know if DAC is active
@@ -203,6 +197,11 @@ private:
     const Time* refTime_;*/
     
     label inertSpecie_;
+    
+    scalar timeTag_;
+    scalar lastTimeUsed_;
+    
+    scalar lastError_;
     //- Use logarithm of temperature                
     //Switch logT_;
     
@@ -319,22 +318,6 @@ public:
         return nUsed_;
     }
     
-    inline label& position()
-    {
-        return position_;
-    }
-    
-    inline label& listIndex()
-    {
-        return listIndex_;
-    }
-    
-    inline const label& listIndex() const
-    {
-        return listIndex_;
-    }
-    
-    
     inline label& spaceSize()
     {
         return spaceSize_;
@@ -426,6 +409,26 @@ public:
     {
         return simplifiedToCompleteIndex_[i];
     }
+    
+    inline label inertSpecie()
+    {
+        return inertSpecie_;
+    }
+    
+    inline const scalar timeTag()
+    {
+        return timeTag_;
+    }
+    
+    inline scalar& lastTimeUsed()
+    {
+        return lastTimeUsed_;
+    }
+    
+    inline scalar& lastError()
+    {
+        return lastError_;
+    }
     /*
     inline fileName failedSpeciesFile()
     {
@@ -434,6 +437,10 @@ public:
     */
     // is the point in the ellipsoid of accuracy?
     bool inEOA(const scalarField& phiq);
+    inline bool checkError(const scalarField& phiq)
+    {
+        return inEOA(phiq);
+    }
     
     // grow the ellipsoid of accuracy?
     void grow(const scalarField& phiq);

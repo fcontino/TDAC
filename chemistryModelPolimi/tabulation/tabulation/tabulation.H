@@ -139,16 +139,10 @@ public:
 	virtual label size() = 0;
 
 	virtual label depth() = 0;
+        
+        virtual bool cleanAndBalance() = 0;
 
-	virtual void add
-        (       
-            const scalarField&,
-            const scalarField&,
-                List<List<scalar> >&,
-            const label
-        ) = 0;
-
-	virtual void add
+	virtual bool add
 	(
 	    const scalarField&,
 	    const scalarField&,
@@ -156,15 +150,6 @@ public:
 		chemPointBase*&,
 	    const label
 	) = 0;
-
-        virtual void replace
-        (
-                chemPointBase*&,
-            const scalarField&,
-            const scalarField&,
-                List<List<scalar> >&,
-            const label
-        ) = 0;
 
         virtual void calcNewC
         (
@@ -187,7 +172,6 @@ public:
             const scalarField&,
                 chemPointBase*&
         ) = 0;
-
 
 };
 
