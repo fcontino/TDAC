@@ -26,6 +26,7 @@ License
 
 #include "mechanismReduction.H"
 #include "Switch.H"
+#include "error.H"
 
 namespace Foam
 {
@@ -57,7 +58,12 @@ Foam::mechanismReduction<CompType,ThermoType>::mechanismReduction
     {
         if(initSet_.found(chemistry.Y()[i].name())) searchInitSet_[j++]=i;
     }
-    
+    if (j<searchInitSet_.size())
+    {
+        FatalErrorIn("Foam::mechanismReduction::mechanismReduction(const Foam::dictionary& dict,Foam::TDACChemistryModel<CompType,ThermoType>& chemistry)")
+            << "At least one species in the intial set is not in the mechanism "
+            << abort(FatalError);
+    }
     
 }
 
