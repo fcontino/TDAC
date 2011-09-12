@@ -572,16 +572,19 @@ bool Foam::ISAT<CompType, ThermoType>::cleanAndBalance()
         //3b- check if the tree should be balanced according to criteria:
         //      number of secondaryRetrieve above a given threshold (portion of totRetrieve = primary+secondary retrieve)
         //      depth of the tree bigger than a*log2(size), where a is a given parameter
-        if
-        (
-            (nFailedFirst_ > max2ndRetBalance_*totRetrieve_) 
-            || 
-            (chemisTree_.depth() > maxDepthFactor_*std::log(chemisTree_.size())/std::log(2.0))
-        )
+        if(chemisTree_.size()>0)
         {
-            totRetrieve_=0;
-            nFailedFirst_=0;
-            treeModified=chemisTree_.balance();
+            if
+                (
+                 (nFailedFirst_ > max2ndRetBalance_*totRetrieve_) 
+                 || 
+                 (chemisTree_.depth() > maxDepthFactor_*std::log(chemisTree_.size())/std::log(2.0))
+                 )
+            {
+                totRetrieve_=0;
+                nFailedFirst_=0;
+                treeModified=chemisTree_.balance();
+            }
         }
     }
     
