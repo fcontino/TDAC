@@ -415,7 +415,7 @@ public:
         return inertSpecie_;
     }
     
-    inline const scalar timeTag()
+    inline const scalar& timeTag()
     {
         return timeTag_;
     }

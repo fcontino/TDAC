@@ -559,7 +559,7 @@ public:
             return notInEOAToAdd_;
         }
         
-        inline const bool exhaustiveSearch()
+        inline bool exhaustiveSearch()
         {
             return exhaustiveSearch_;
         }
