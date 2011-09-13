@@ -249,13 +249,13 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
                 
                 //check if the tree should be cleaned and balanced
                 //(after a given number of time steps, that may be less than 1)
-                nbCellsVisited_++;
-/*                if(nbCellsVisited_ > checkTab_*meshSize)
+                nCellsVisited_++;
+                if((cellIndexToCompute.size()==0) && (nCellsVisited_ > checkTab_*meshSize))
                 {
-                    nbCellsVisited_=0;
+                    nCellsVisited_=0;
                     tabPtr_->cleanAndBalance();
                 }                
-                */
+                
             }
             //Retrieve has failed. 
             //The closest point found, the composition of the query and the error of inEOA
@@ -544,13 +544,13 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
                 }
                 updateRR(c0,c,tmpCelli,Wi,deltaT);
                 
-                nbCellsVisited_++;            
+                nCellsVisited_++;            
             }//end of loop forAll(cellToCompute)
-
             //check if the tree should be cleaned and balanced            
-            if(nbCellsVisited_ > checkTab_*meshSize)
+
+            if(nCellsVisited_ > checkTab_*meshSize)
             {
-                nbCellsVisited_=0;
+                nCellsVisited_=0;
                 tabPtr_->cleanAndBalance();
             }   
             

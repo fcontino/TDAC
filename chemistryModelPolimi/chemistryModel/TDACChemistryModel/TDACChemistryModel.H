@@ -174,7 +174,6 @@ private:
         //- Option to perform an exhaustive search in the binary tree
         Switch exhaustiveSearch_;
         
-        label nbCellsVisited_;
         
     // Private Member Functions
 

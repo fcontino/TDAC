@@ -111,8 +111,7 @@ Foam::TDACChemistryModel<CompType, ThermoType>::TDACChemistryModel
     growOrAddImpact_(),
     growOrAddNotInEOA_(),
     analyzeTab_(this->subDict("tabulation").lookupOrDefault("analyzeTab",false)),
-    exhaustiveSearch_(false),
-    nbCellsVisited_(0)
+    exhaustiveSearch_(false)
 {
 
     // create the fields for the chemistry sources
@@ -124,6 +123,7 @@ Foam::TDACChemistryModel<CompType, ThermoType>::TDACChemistryModel
             new scalarField(mesh.nCells(), 0.0)
         );
     }
+
     {
         IOdictionary thermoDict
         (
