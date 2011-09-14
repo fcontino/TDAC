@@ -420,6 +420,7 @@ bool Foam::ISAT<CompType, ThermoType>::add
             //create a copy of each chemPointISAT of the MRUList_
             
             chemisTree().clear();
+	    toRemoveList_.clear();
 
             chemPointISAT<CompType, ThermoType>* nulPhi=0;
             //insert the point to add first
@@ -444,6 +445,7 @@ bool Foam::ISAT<CompType, ThermoType>::add
         else
         {
             chemisTree().clear();
+	    toRemoveList_.clear();
             chemPointISAT<CompType, ThermoType>* nulPhi=0;
             chemisTree().insertNewLeaf(phiq, Rphiq, A, scaleFactor(), tolerance(), nCols,nulPhi);
         }
@@ -465,6 +467,7 @@ void Foam::ISAT<CompType, ThermoType>::clear()
 
     Info<< "Clearing chemistry library" << endl;
     chemisTree_.clear();
+    toRemoveList_.clear();
 }
 
 
