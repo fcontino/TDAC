@@ -89,7 +89,7 @@ Foam::TDACChemistryModel<CompType, ThermoType>::TDACChemistryModel
     nCellsVisited_(0),
     //by default, the solve function will check the tabulation every 1000 time-steps
     //note: this is an approximation since it use meshSize to allow the use of floating point value
-    checkTab_(this->subDict("tabulation").lookupOrDefault("checkTab",1000)),
+    checkTab_(this->subDict("tabulation").lookupOrDefault("checkTab",1000.0)),
     //by default the size of the maxToComputeList corresponds to a direct treatment of not in EOA points
     maxToComputeList_(this->subDict("tabulation").lookupOrDefault("maxToComputeList",1)),
     reactionsDisabled_(this->nReaction(), false),
