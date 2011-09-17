@@ -254,7 +254,8 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
                 {
                     nCellsVisited_=0;
                     tabPtr_->cleanAndBalance();
-                }                
+                }   
+//                updateTreeCpuTime_ += clockTime_.timeIncrement();             
                 
             }
             //Retrieve has failed. 
@@ -347,6 +348,8 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
             ((ci == meshSize-1) && cellIndexToCompute.size()>0)
         )
         {
+            clockTime_.timeIncrement();             
+
             computeListFlag=false;
             //sort the list of errors and start with biggest error
             SortableList<scalar> inEOAErrorToSort(inEOAError);//sorted in constructor in increasing order
@@ -548,6 +551,8 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
             }//end of loop forAll(cellToCompute)
             //check if the tree should be cleaned and balanced            
 
+//            computeAfterCpuTime_ += clockTime_.timeIncrement();             
+
             if(nCellsVisited_ > checkTab_*meshSize)
             {
                 nCellsVisited_=0;
@@ -559,6 +564,8 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
             chPStored.clear();
             inEOAError.clear();
             
+//            updateTreeCpuTime_ += clockTime_.timeIncrement();             
+
         }//end if size of the list to compute is bigger than max
         
 	clockTime_.timeIncrement();

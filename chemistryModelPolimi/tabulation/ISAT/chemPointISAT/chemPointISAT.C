@@ -196,7 +196,6 @@ bool chemPointISAT<CompType, ThermoType>::inEOA(const scalarField& phiq)
             continue;
         
         scalar epsTemp=0.0;
-        scalarList curEps(spaceSize(),0.0);
       
         //without DAC OR with DAC and on an active species line
         //multiply L by dphi to get the distance in the active species direction
@@ -213,18 +212,14 @@ bool chemPointISAT<CompType, ThermoType>::inEOA(const scalarField& phiq)
                 if(DAC_) sj =simplifiedToCompleteIndex(j);
                 else	sj=j;
 
-                curEps[sj]=LTvar[si][j]*dphi[sj];
-                epsTemp += curEps[sj];
+                epsTemp += LTvar[si][j]*dphi[sj];
             }
-            curEps[spaceSize()-2]=LTvar[si][NsDAC_]*dphi[spaceSize()-2];
-            epsTemp += curEps[spaceSize()-2];
-            curEps[spaceSize()-1]=LTvar[si][NsDAC_+1]*dphi[spaceSize()-1];
-            epsTemp += curEps[spaceSize()-1];
+            epsTemp += LTvar[si][NsDAC_]*dphi[spaceSize()-2];
+            epsTemp += LTvar[si][NsDAC_+1]*dphi[spaceSize()-1];
         }
         else
         {
             epsTemp = dphi[i]/(epsTol_*scaleFactor_[i]);
-            curEps[i] = epsTemp;
         }
 
         lastError_ += sqr(epsTemp);
@@ -234,22 +229,7 @@ bool chemPointISAT<CompType, ThermoType>::inEOA(const scalarField& phiq)
             if(chemistry_->analyzeTab())
             {
                 chemistry_->addToSpeciesNotInEOA(i); //not in the EOA for the ith species direction in the composition space
-                scalar maxEps = 1.0;
-                label epsIndex = -1;
-                forAll(curEps,cei)
-                {
-                    if(fabs(curEps[cei]) > maxEps)
-                    {
-                        maxEps = fabs(curEps[cei]);
-                        epsIndex = cei;
-                    }
-                }
-                if (epsIndex != -1)
-                {
-                    chemistry_->addToSpeciesImpact(epsIndex);
-                }
             }   
-            //should break when optimized but to analyze ISAT we need to go to the end
             break; 
         }
         else if(lastError_ > 1.0)
