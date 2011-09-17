@@ -90,7 +90,9 @@ tabulation
 	checkUsed		1;
         
 	checkGrown		400;	
-
+	
+	//parameter multiplied by the meshSize and compared to the number of visited cell
+	//when this number reach a threslhold, the cleanAndBalance function of ISAT is called
 	checkTab		1;
 
 	maxElements             1000;
