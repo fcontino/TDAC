@@ -1,0 +1,138 @@
+/*---------------------------------------------------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  1.0                                   |
+|   \\  /    A nd           | Web:      http://www.openfoam.org               |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+
+FoamFile
+{
+version  			2.0;
+format   			ascii;
+class 				dictionary;
+object 				chemistryProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+
+
+psiChemistryModel	ODEChemistryModel<gasThermoPhysics>;
+psiTDACChemistryModel	TDACChemistryModel<gasThermoPhysics>;
+
+
+chemistry	on;
+//chemistry				off;
+
+chemistrySolverTDAC			odeTDAC;
+//chemistrySolver		EulerImplicit;
+//chemistrySolver		sequential;
+
+initialChemicalTimeStep		1.0e-7;
+//initialChemicalTimeStep		1.0;
+
+sequentialCoeffs
+{
+	cTauChem		1.0e-3;
+	equilibriumRateLimiter		on;
+}
+
+EulerImplicitCoeffs
+{
+	cTauChem		5.0e-1;
+//	cTauChem		5.0e-2;
+	equilibriumRateLimiter		off;
+}
+
+odeTDACCoeffs
+{
+	ODESolver		SIBS;
+	eps			1.0e-03;
+	scale			1.0;
+}
+
+mechanismReduction
+{
+NGroupBased		10;
+	online			on;
+//	online			off;
+//	reductionAlgorithm	DRG;
+//	epsDAC			1.0e-3;
+        reductionAlgorithm	DRG;
+	epsDAC                  2.0e-2;
+        initialSet
+        {
+                NC7H16;
+                CO;
+                HO2;
+        }
+}
+
+outputSpecies
+{
+        NC7H16;
+        CO;
+	CO2;
+        CH2O;
+}
+
+
+
+tabulation
+{
+        online                  on;
+	//online			off;
+
+	tabulationAlgorithm	ISAT;
+
+        tolerance               1e-6;
+
+	checkUsed		1;
+        
+	checkGrown		400;	
+
+	checkTab		1;
+
+	maxElements             1000;
+
+        //maximum number of points failing to be retrieve before handling them
+        maxToComputeList        100;
+
+	//interval (in time-steps) before scanning the entire tree for old chemPoints or balancing threshold
+	checkEntireTreeInterval	2;
+	
+	//factor that multiply the perfectly balanced tree depth 
+	maxDepthFactor		2.0;
+	        
+	//maximum life time (in time-steps) for a chemPoints
+	chPMaxLifeTime		1;
+	
+	//maximum number of secondry retrieve attempts
+	max2ndSearch		1;
+	
+        cleanAll                off;
+
+        scaleFactor
+        {
+            
+            otherSpecies	1;
+	    NC7H16		0.1;
+	    CO2			0.1;
+	    CO			0.1;
+	    H2O			0.1;
+	 /*   NXC7H16		0.01;
+	    O2			0.01;
+	    OH			0.01;
+	    CO2			0.01;
+	    HO2			0.01;
+	    CO			0.01;
+	*/
+            Temperature 	1;
+            Pressure   		1;
+        } 
+
+
+        
+}
+
+// ************************************************************************* //
