@@ -49,6 +49,7 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
 {
     const clockTime clockTime_= clockTime();
     clockTime_.timeIncrement();
+    scalar invDeltaT=1.0/deltaT;
 
     //check if the current time falls in a new time bin
     if(analyzeTab_ && (runTime_.value()-previousTime_ > timeBin_))
@@ -150,6 +151,7 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
     bool computeListFlag(false);
     for(label ci=0;ci<meshSize; ci++)
     {
+/*    
         if(analyzeTab_)
         {
             if(!growOrAddImpact_.empty())
@@ -157,7 +159,7 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
             if(!growOrAddNotInEOA_.empty())
                 growOrAddNotInEOA_.clear();
         }                
-
+*/
         label celli(cellIndexTmp[ci]);
         
         scalar rhoi = rho[celli];
@@ -245,7 +247,7 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
                 for (label i=0; i<this->nSpecie(); i++) 
                     c[i] = rhoi*Rphiq[i]*invWi[i];
                 
-                updateRR(c0,c,celli,Wi,deltaT);
+                updateRR(c0,c,celli,Wi,invDeltaT);
                 
                 //check if the tree should be cleaned and balanced
                 //(after a given number of time steps, that may be less than 1)
@@ -332,7 +334,7 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
                 for (label i=0; i<NsDAC(); i++)  c[simplifiedToCompleteIndex(i)] = simplifiedC_[i];
             }
 	    deltaTMin = min(tauC, deltaTMin);    
-            updateRR(c0,c,celli,Wi,deltaT);    
+            updateRR(c0,c,celli,Wi,invDeltaT);    
         }
         
         //when the size of the list to compute for growth and addition
@@ -342,6 +344,7 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
         (
             (cellIndexToCompute.size() >= maxToComputeList_) 
             || 
+            //computeListFlag is used when no chemPoint are stored
             computeListFlag 
             || 
             //if we have visited all cells and we did not reach the maximum size allowable
@@ -349,7 +352,6 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
         )
         {
             clockTime_.timeIncrement();             
-
             computeListFlag=false;
             //sort the list of errors and start with biggest error
             SortableList<scalar> inEOAErrorToSort(inEOAError);//sorted in constructor in increasing order
@@ -408,7 +410,7 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
                 //we can use the stored chemPoint to check the error
                 //note : this is performed only if the maxSize is above 1
                 //otherwise, we already know that it is out of bound
-                else if((maxToComputeList_>1) && (phi0!=NULL) && !cleared)//make sure the pointer is valid
+                else if((maxToComputeList_>1) && (phi0!=NULL) && !cleared && agi>0)//make sure the pointer is valid
                 {                   
                     if(phi0->checkError(phiq))
                     {
@@ -501,6 +503,7 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
                     {
                         addNewLeafCpuTime_ += clockTime_.timeIncrement();
                         nGrown_ ++;
+/*                        
                         if(!growOrAddImpact_.empty() && analyzeTab_)
                         {
                             forAll(growOrAddImpact_(),gi)
@@ -509,6 +512,7 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
                                     notInEOAToGrow_[curTimeBinIndex_]->operator[](gi)++;
                             }
                         }
+*/
                     }
                     //ADD if the growth failed, a new leaf is created and added to the binary tree
                     else
@@ -535,6 +539,7 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
                         cleared = (tabPtr_->add(phiq, Rphiq, A, phi0, this->nEqns()) || cleared);
                         treeModified=true;
                         addNewLeafCpuTime_ += clockTime_.timeIncrement();
+/*                        
                         if(!growOrAddImpact_.empty() && analyzeTab_)
                         {
                             forAll(growOrAddImpact_(),gi)
@@ -543,9 +548,10 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
                                     notInEOAToAdd_[curTimeBinIndex_]->operator[](gi)++;
                             }
                         }
+*/
                     }//end of "growth has failed"
                 }
-                updateRR(c0,c,tmpCelli,Wi,deltaT);
+                updateRR(c0,c,tmpCelli,Wi,invDeltaT);
                 
                 nCellsVisited_++;            
             }//end of loop forAll(cellToCompute)
@@ -616,13 +622,12 @@ void Foam::TDACChemistryModel<CompType, ThermoType>::updateRR
     const scalarField& c,
     label tmpCelli,
     const scalarField& Wi,
-    const scalar deltaT
+    const scalar invDeltaT
 )
 {
-    scalarField dc = c - c0;
     for(label i=0; i<this->nSpecie(); i++)
     {
-        this->RR()[i][tmpCelli] = dc[i]*Wi[i]/deltaT;
+        this->RR()[i][tmpCelli] = (c[i]-c0[i])*Wi[i]*invDeltaT;
     }
 }
 

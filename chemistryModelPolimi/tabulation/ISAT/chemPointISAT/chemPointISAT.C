@@ -186,10 +186,9 @@ bool chemPointISAT<CompType, ThermoType>::inEOA(const scalarField& phiq)
     lastError_=0.0;
     const List<List<scalar> >& LTvar = LT();
     scalarField dphi=phiq-phi();
-    label dim = spaceSize()-2;
-    if (DAC_) dim = NsDAC_;
+    label dim = (DAC_) ? NsDAC_ : spaceSize()-2;
     
-    for (register label i=0; i<spaceSize()-2; i++)
+    for (label i=0; i<spaceSize()-2; i++)
     {
         //skip the inertSpecie
         if (i==inertSpecie_)
@@ -203,15 +202,10 @@ bool chemPointISAT<CompType, ThermoType>::inEOA(const scalarField& phiq)
         //and dphi
         if (!(DAC_) || (DAC_ && completeToSimplifiedIndex(i)!=-1))
         {
-            label si;
-            if(DAC_) si=completeToSimplifiedIndex(i);
-            else si=i;
-            for(register label j=si; j<dim; j++)//LT is upper triangular
+            label si = (DAC_) ? completeToSimplifiedIndex(i) : i;
+            for(label j=si; j<dim; j++)//LT is upper triangular
             {
-                label sj;
-                if(DAC_) sj =simplifiedToCompleteIndex(j);
-                else	sj=j;
-
+                label sj = (DAC_) ? simplifiedToCompleteIndex(j) : j;
                 epsTemp += LTvar[si][j]*dphi[sj];
             }
             epsTemp += LTvar[si][NsDAC_]*dphi[spaceSize()-2];
@@ -226,10 +220,11 @@ bool chemPointISAT<CompType, ThermoType>::inEOA(const scalarField& phiq)
         
         if(fabs(epsTemp) > 1.0)
         {
-            if(chemistry_->analyzeTab())
+/*            if(chemistry_->analyzeTab())
             {
                 chemistry_->addToSpeciesNotInEOA(i); //not in the EOA for the ith species direction in the composition space
             }   
+*/            
             break; 
         }
         else if(lastError_ > 1.0)

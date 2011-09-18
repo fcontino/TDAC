@@ -266,8 +266,6 @@ bool Foam::ISAT<CompType, ThermoType>::retrieve
         }
         return false;
     }
-
-
 }
 
 
