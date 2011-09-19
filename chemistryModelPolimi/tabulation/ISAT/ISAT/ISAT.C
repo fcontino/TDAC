@@ -51,7 +51,7 @@ Foam::ISAT<CompType, ThermoType>::ISAT
     scaleFactor_(chemistry_.Y().size()+2,1.0),
     tauStar_(false),
     clean_(this->coeffsDict_.lookupOrDefault("cleanAll", false)),
-    checkUsed_(this->coeffsDict_.lookupOrDefault("checkUsed", 1000.0),
+    checkUsed_(this->coeffsDict_.lookupOrDefault("checkUsed", 1000.0)),
     checkGrown_(this->coeffsDict_.lookupOrDefault("checkGrown", INT_MAX)),
     MRUSize_(this->coeffsDict_.lookupOrDefault("MRUSize", 0)),
     cleaningRequired_(false),
