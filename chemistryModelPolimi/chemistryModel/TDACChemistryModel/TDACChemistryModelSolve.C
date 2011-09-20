@@ -362,6 +362,9 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
 
             forAll(cellIndexToCompute,agi)
             {   
+//------TEST------//            
+                if(maxToComputeList_>1)//if not greater than 1, the size remains the same
+                {
                 label tmpCelli=cellIndexToCompute[iToComp[tcS-agi-1]];//start by the end for decreasing order
                 rhoi = rho[tmpCelli];
                 for(label i=0; i<this->nSpecie(); i++)
@@ -387,6 +390,8 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
                 //store the initial molar concentration to compute dc=c-c0
                 c0 = c;
                 chemPointBase* phi0 = chPStored[iToComp[tcS-agi-1]];
+                }
+//-------END OF TEST-------/                
                 bool retrieved(false);
                 //if the tree has been modified, the retrieve function should be called
                 
