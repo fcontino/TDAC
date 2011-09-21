@@ -202,6 +202,7 @@ private:
     scalar lastTimeUsed_;
     
     scalar lastError_;
+    bool toRemove_;
     //- Use logarithm of temperature                
     //Switch logT_;
     
@@ -428,6 +429,11 @@ public:
     inline scalar& lastError()
     {
         return lastError_;
+    }
+    
+    inline bool& toRemove()
+    {
+        return toRemove_;
     }
     /*
     inline fileName failedSpeciesFile()

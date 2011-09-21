@@ -145,9 +145,10 @@ bool Foam::ISAT<CompType, ThermoType>::retrieve
 	chemPointISAT<CompType, ThermoType>* phi0 = dynamic_cast<chemPointISAT<CompType, ThermoType>*>(closest);
         if(phi0->inEOA(phiq))
         {	
-            if(phi0->nUsed() > checkUsed()*chemistry_.Y()[0].size())
+            if(phi0->nUsed() > checkUsed()*chemistry_.Y()[0].size() && !phi0->toRemove())
             {
                 cleaningRequired_ = true;
+                phi0->toRemove() = true;
                 bool inList(false);
                 forAll(toRemoveList_,tRi)
                 {
@@ -177,9 +178,10 @@ bool Foam::ISAT<CompType, ThermoType>::retrieve
                 {
                     closest = phi0;
                     chemistry_.nFailBTGoodEOA()++;
-                    if(phi0->nUsed() > checkUsed()*chemistry_.Y()[0].size())
+                    if(phi0->nUsed() > checkUsed()*chemistry_.Y()[0].size() && !phi0->toRemove())
                     {
                         cleaningRequired_ = true;
+                        phi0->toRemove() = true;
                         bool inList(false);
                         forAll(toRemoveList_,tRi)
                         {
@@ -205,9 +207,10 @@ bool Foam::ISAT<CompType, ThermoType>::retrieve
 	}
         else if(chemisTree_.secondaryBTSearch(phiq, phi0))
         {
-            if(phi0->nUsed() > checkUsed()*chemistry_.Y()[0].size())
+            if(phi0->nUsed() > checkUsed()*chemistry_.Y()[0].size() && !phi0->toRemove())
             {
                 cleaningRequired_ = true;
+                phi0->toRemove() = true;
                 bool inList(false);
                 forAll(toRemoveList_,tRi)
                 {
@@ -239,9 +242,10 @@ bool Foam::ISAT<CompType, ThermoType>::retrieve
                 if(phi0->inEOA(phiq))
                 {
                     chemistry_.nFailBTGoodEOA()++;
-                    if(phi0->nUsed() > checkUsed()*chemistry_.Y()[0].size())
+                    if(phi0->nUsed() > checkUsed()*chemistry_.Y()[0].size() && !phi0->toRemove())
                     {
                         cleaningRequired_ = true;
+                        phi0->toRemove() = true;
                         bool inList(false);
                         forAll(toRemoveList_,tRi)
                         {
@@ -296,9 +300,10 @@ bool Foam::ISAT<CompType, ThermoType>::grow
     if (phi0->checkSolution(phiq,Rphiq))
     {
         //phi0 is only grown when checkSolution returns true
-        if (phi0->nGrown() > checkGrown())
+        if (phi0->nGrown() > checkGrown() && !phi0->toRemove())
         {
             cleaningRequired_ = true;
+            phi0->toRemove() = true;
             bool inList(false);
             forAll(toRemoveList_,tRi)
             {

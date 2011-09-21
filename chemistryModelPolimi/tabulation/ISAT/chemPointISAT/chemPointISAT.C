@@ -77,7 +77,8 @@ binaryNode<CompType, ThermoType>* node
     inertSpecie_(-1),
     timeTag_(chemistry_->time().timeOutputValue()),
     lastTimeUsed_(chemistry_->time().timeOutputValue()),
-    lastError_(0.0)/*,
+    lastError_(0.0),
+    toRemove_(false)/*,
     failedSpeciesFile_(chemistry.thermo().T().mesh().time().path()+"/failedSpecies.out"),
     failedSpecies_(failedSpeciesFile_.c_str(), ofstream::app),
     refTime_(&chemistry.thermo().T().mesh().time())*/
@@ -160,7 +161,8 @@ chemPointISAT<CompType, ThermoType>::chemPointISAT
     simplifiedToCompleteIndex_(p.simplifiedToCompleteIndex()),
     inertSpecie_(p.inertspecie()),
     timeTag_(p.timeTag()),
-    lastTimeUsed_(p.lastTimeUsed())/*,
+    lastTimeUsed_(p.lastTimeUsed()),
+    toRemove_(p.toRemove())/*,
     failedSpeciesFile_(p.failedSpeciesFile()),
     failedSpecies_(failedSpeciesFile_.c_str(), ofstream::app)*/
 {
@@ -217,14 +219,14 @@ bool chemPointISAT<CompType, ThermoType>::inEOA(const scalarField& phiq)
         }
 
         lastError_ += sqr(epsTemp);
-        
+/*        
         if(fabs(epsTemp) > 1.0)
         {
-/*            if(chemistry_->analyzeTab())
+            if(chemistry_->analyzeTab())
             {
                 chemistry_->addToSpeciesNotInEOA(i); //not in the EOA for the ith species direction in the composition space
             }   
-*/            
+            
             break; 
         }
         else if(lastError_ > 1.0)
@@ -232,6 +234,7 @@ bool chemPointISAT<CompType, ThermoType>::inEOA(const scalarField& phiq)
             //the error can only grow, therefore, once it is above 1.0, we can stop the loop
             break;
         }
+*/        
     }
     
     //sqrt(eps2) is not required since it is compared to 1	
