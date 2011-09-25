@@ -159,7 +159,7 @@ chemPointISAT<CompType, ThermoType>::chemPointISAT
     NsDAC_(p.NsDAC()),
     completeToSimplifiedIndex_(p.completeToSimplifiedIndex()),
     simplifiedToCompleteIndex_(p.simplifiedToCompleteIndex()),
-    inertSpecie_(p.inertspecie()),
+    inertSpecie_(p.inertSpecie()),
     timeTag_(p.timeTag()),
     lastTimeUsed_(p.lastTimeUsed()),
     toRemove_(p.toRemove())/*,

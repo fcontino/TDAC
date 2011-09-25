@@ -419,11 +419,17 @@ bool Foam::ISAT<CompType, ThermoType>::add
     {
         if (MRUSize_>0)
         {
-            List<chemPointISAT<CompType, ThermoType>*> tempList(MRUList_);
+            DynamicList<chemPointISAT<CompType, ThermoType>*> tempList;
             //create a copy of each chemPointISAT of the MRUList_
+            typename SLList<chemPointISAT<CompType, ThermoType>*>::iterator iter = MRUList_.begin();
+            for ( ; iter != MRUList_.end(); ++iter)
+            {
+                tempList.append(new chemPointISAT<CompType, ThermoType>(*iter()));
+            }
             
             chemisTree().clear();
 	    toRemoveList_.clear();
+            MRUList_.clear();
 
             chemPointISAT<CompType, ThermoType>* nulPhi=0;
             //insert the point to add first
@@ -443,6 +449,7 @@ bool Foam::ISAT<CompType, ThermoType>::add
                     nCols,
                     nulPhi
                 );
+                deleteDemandDrivenData(tempList[i]);
             }
         }
         else
@@ -471,6 +478,7 @@ void Foam::ISAT<CompType, ThermoType>::clear()
     Info<< "Clearing chemistry library" << endl;
     chemisTree_.clear();
     toRemoveList_.clear();
+    MRUList_.clear();
 }
 
 
@@ -536,6 +544,7 @@ bool Foam::ISAT<CompType, ThermoType>::cleanAndBalance()
     if(cleaningRequired_)
     {
         cleaningRequired_=false;
+        MRUList_.clear();
         //2- remove the points that have raised a flag because of number of growth or used 
         //(they are stored in the toRemoveList)
         forAll(toRemoveList_,trli)
@@ -593,6 +602,9 @@ bool Foam::ISAT<CompType, ThermoType>::cleanAndBalance()
             }
         }
     }
+    
+    if(treeModified)
+        MRUList_.clear();
     
     //return a bool to specify if the tree structure has been modified
     return treeModified;
