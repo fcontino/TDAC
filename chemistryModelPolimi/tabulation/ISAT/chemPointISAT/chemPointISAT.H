@@ -449,7 +449,7 @@ public:
     }
     
     // grow the ellipsoid of accuracy?
-    void grow(const scalarField& phiq);
+    bool grow(const scalarField& phiq);
     
     // check if the new solution is in the ellipsoid of accuracy?
     bool checkSolution(const scalarField& phiq, const scalarField& Rphiq);

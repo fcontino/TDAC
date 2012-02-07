@@ -38,8 +38,8 @@ SourceFiles
 #ifndef psiTDACChemistryModel_H
 #define psiTDACChemistryModel_H
 
-#include "basicChemistryModel.H"
 #include "autoPtr.H"
+#include "basicChemistryModel.H"
 #include "runTimeSelectionTables.H"
 #include "hsCombustionThermo.H"
 

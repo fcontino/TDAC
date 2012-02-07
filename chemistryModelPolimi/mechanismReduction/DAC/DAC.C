@@ -54,7 +54,9 @@ Foam::DAC<CompType,ThermoType>::DAC
     phiTol_(this->epsDAC()),
     NOxThreshold_(1800),
     testPhi_(dict.name().path()+"/../phi.Cyl"),
-    testPhil_(dict.name().path()+"/../phil.Cyl")
+    testPhil_(dict.name().path()+"/../phil.Cyl"),
+    NOStart_(dict.name().path()+"/../NOStart.Cyl"),
+    NOStarted_(false)
 {
 
     Info << "configuring DAC mechanism reduction method" << endl;
@@ -536,6 +538,12 @@ void Foam::DAC<CompType,ThermoType>::reduceMechanism
             speciesNumber++;
             this->activeSpecies_[NOId_] = true;
             Rvalue[NOId_] = 1.0;        
+	    if(!NOStarted_)
+	    {
+		NOStarted_ = true;
+	    	NOStart_ << this->chemistry_.Y()[0].time().timeOutputValue() << endl;
+	    }
+	
         }
     }
     else //No automaticSIS => all species of the SIS are added
@@ -580,6 +588,15 @@ void Foam::DAC<CompType,ThermoType>::reduceMechanism
                         //the (composed) link is stronger than the user-defined tolerance
                         if (Rtemp >= this->epsDAC())
                         {
+		   	    if(otherSpec == NOId_)
+	                    {
+                    		if(!NOStarted_)
+                    		{
+                        	    NOStarted_ = true;
+                        	    NOStart_ << this->chemistry_.Y()[0].time().timeOutputValue() << endl;
+                    		}
+                	    }
+
                             Q.push(otherSpec);
                             Rvalue[otherSpec] = Rtemp;
                             if (!this->activeSpecies_[otherSpec])

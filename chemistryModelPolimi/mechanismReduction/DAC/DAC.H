@@ -118,6 +118,8 @@ class DAC
     
     OFstream testPhi_;
     OFstream testPhil_;
+    OFstream NOStart_;
+    bool NOStarted_;
 
 public:
 

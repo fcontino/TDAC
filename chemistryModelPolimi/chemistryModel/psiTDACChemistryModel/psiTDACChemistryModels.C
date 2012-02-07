@@ -30,11 +30,11 @@ Description
 
 \*---------------------------------------------------------------------------*/
 
+#include "thermoPhysicsTypes.H"
 #include "makeChemistryModel.H"
 
 #include "psiTDACChemistryModel.H"
 #include "TDACChemistryModel.H"
-#include "thermoPhysicsTypes.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

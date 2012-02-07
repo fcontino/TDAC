@@ -295,30 +295,34 @@ bool Foam::ISAT<CompType, ThermoType>::grow
     }
 	
     chemPointISAT<CompType, ThermoType>* phi0 = dynamic_cast<chemPointISAT<CompType, ThermoType>*>(phi0Base);
-
     
-    if (phi0->checkSolution(phiq,Rphiq))
+    if (phi0->nGrown() < checkGrown() && !phi0->toRemove())
     {
         //phi0 is only grown when checkSolution returns true
-        if (phi0->nGrown() > checkGrown() && !phi0->toRemove())
+        if (phi0->checkSolution(phiq,Rphiq))
         {
-            cleaningRequired_ = true;
-            phi0->toRemove() = true;
-            bool inList(false);
-            forAll(toRemoveList_,tRi)
+	    return true;
+	}
+    }
+    else if (!phi0->toRemove())
+    {
+	cleaningRequired_ = true;
+        phi0->toRemove() = true;
+        bool inList(false);
+        forAll(toRemoveList_,tRi)
+        {
+            if(toRemoveList_[tRi]==phi0)
             {
-                if(toRemoveList_[tRi]==phi0)
-                {
-                    inList=true;
-                    break;
-                }
+                inList=true;
+                break;
             }
-            if(!inList)
-            {
-                toRemoveList_.append(phi0);
-            }    
         }
-	return true;
+        if(!inList)
+        {
+            toRemoveList_.append(phi0);
+        } 
+
+	return false;
     }
     else
     {

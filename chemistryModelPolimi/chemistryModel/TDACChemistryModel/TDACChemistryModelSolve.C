@@ -289,6 +289,7 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
         //If ISAT is not used, direct integration is used for every cells
 	else
         {
+clockTime_.timeIncrement();
 	    if (DAC_) mechRed_->reduceMechanism(c, Ti, pi);
 	    while(timeLeft > SMALL)
 	    {
@@ -335,8 +336,9 @@ Foam::scalar Foam::TDACChemistryModel<CompType, ThermoType>::solve(const scalar 
             }
 	    deltaTMin = min(tauC, deltaTMin);    
             updateRR(c0,c,celli,Wi,invDeltaT);    
+Info << "dt one cell = " << clockTime_.timeIncrement() << endl; 
         }
-        
+
         //when the size of the list to compute for growth and addition
         //is bigger than the maximum allowed size list, perform the addition and growth
         //when maxToComputeList_ == 1, perform immediately 

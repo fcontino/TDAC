@@ -1,19 +1,21 @@
 EXE_INC = \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
-    -I$(LIB_SRC)/thermophysicalModels/reactionThermo/lnInclude \
+    -I$(POLIMI_SRC)/thermophysicalModelsPolimi/reactionThermoPolimi/lnInclude \
     -I$(LIB_SRC)/thermophysicalModels/basic/lnInclude \
     -I$(LIB_SRC)/thermophysicalModels/specie/lnInclude \
     -I$(LIB_SRC)/thermophysicalModels/functions/Polynomial \
     -I$(LIB_SRC)/thermophysicalModels/thermophysicalFunctions/lnInclude \
     -I$(LIB_SRC)/ODE/lnInclude \
+    -IlnInclude \
     -I$(LIB_SRC)/turbulenceModels/compressible/lnInclude \
     -I$(POLIMI_SRC)/compressibleRASModelPolimi\lnInclude \
     -I$(POLIMI_SRC)/boundaryConditionsEnginePolimi\lnInclude \
-    -L$(POLIMI_LIBBIN)
+    -L$(POLIMI_LIBBIN) \
+    -L$(FOAM_USER_LIBBIN)
 
 LIB_LIBS = \
     -lbasicThermophysicalModels \
-    -lreactionThermophysicalModels \
+    -lreactionThermophysicalModelsPolimi \
     -lspecie \
 	-lODE \
     -lthermophysicalFunctions \

@@ -203,10 +203,14 @@ Foam::TDACChemistryModel<CompType, ThermoType>::TDACChemistryModel
                 {
                     Y_[i].writeOpt()=IOobject::NO_WRITE;
                 }
+                dynamic_cast<reactingMixture<ThermoType>&>
+                    (this->thermo()).setInActive(i);
             }
             else 
             {
                 activeSpecies_[i]=true;
+                dynamic_cast<reactingMixture<ThermoType>&>
+                    (this->thermo()).setActive(i);
             }
 
         }
@@ -216,6 +220,8 @@ Foam::TDACChemistryModel<CompType, ThermoType>::TDACChemistryModel
         forAll(this->Y(),i)
         {
             activeSpecies_[i]=true;
+            dynamic_cast<reactingMixture<ThermoType>&>
+            (this->thermo()).setActive(i);
         }
     }  
 
@@ -974,6 +980,8 @@ void Foam::TDACChemistryModel<CompType, ThermoType>::setActive(label i)
 {
     this->Y()[i].writeOpt()=IOobject::AUTO_WRITE;
     activeSpecies_[i]=true;
+    dynamic_cast<reactingMixture<ThermoType>&>
+            (this->thermo()).setActive(i);
 }
 
 template<class CompType, class ThermoType>

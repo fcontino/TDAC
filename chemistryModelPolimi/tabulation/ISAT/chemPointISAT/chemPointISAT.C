@@ -110,10 +110,11 @@ binaryNode<CompType, ThermoType>* node
     for (register label i=0; i<dim; i++) diag[i]=max(diag[i], 0.5);
     
     //reconstruct Atilde = U*D'*V (ellipsoid in with length d'[i] and principal semi-axes in the direction of the column of )
+
     for (register label i=0; i<dim-2; i++)
     {
         scalarField AtildeI(dim);
-        for (register label n=0; n<dim; n++) AtildeI[n] = Atilde[i][n];
+      for (register label n=0; n<dim; n++) AtildeI[n] = Atilde[i][n];
         for (register label j=0; j<dim; j++)
         {	
             Atilde[i][j]=0.0;
@@ -124,6 +125,7 @@ binaryNode<CompType, ThermoType>* node
             Atilde[i][j] /= (epsTol*scaleFactor[si]); 
         }
     }
+
     qrDecompose(dim,Atilde);
     word inertSpecieName(chemistry.thermo().lookup("inertSpecie"));
     forAll(chemistry.Y(),Yi)
@@ -284,6 +286,11 @@ bool chemPointISAT<CompType, ThermoType>::checkSolution(const scalarField& phiq,
     
     for (register label i=0; i<spaceSize()-2; i++)
     {
+
+//The following two lines have not been tested yet 
+//        if (i==inertSpecie_)
+//            continue;
+
         dRl = 0.0;
         if (DAC_)
         {
@@ -322,11 +329,15 @@ bool chemPointISAT<CompType, ThermoType>::checkSolution(const scalarField& phiq,
     }
     else
     {
+	nGrown_++;
         // if the solution is in the ellipsoid of accuracy
         // GROW operation performed
-	nGrown_++;
-	grow(phiq); //phiq is on the boundary of the EOA
-        return true;    
+	if(grow(phiq)) //phiq is on the boundary of the EOA or grow has failed
+	{
+            return true;    
+	}
+	else
+	    return false;
     }
 }
 
@@ -347,31 +358,50 @@ bool chemPointISAT<CompType, ThermoType>::checkSolution(const scalarField& phiq,
   			
 \*---------------------------------------------------------------------------*/
 template<class CompType, class ThermoType>
-void chemPointISAT<CompType, ThermoType>::grow(const scalarField& phiq)
+bool chemPointISAT<CompType, ThermoType>::grow(const scalarField& phiq)
 {
     List<List<scalar> >& LTvar = LT();
     List<List<scalar> >& Avar  = A();
     scalarField dphi = phiq - phi();
     label dim = spaceSize();
     label initNsDAC(NsDAC_);
-    
+  
+ //CAUTION : this is not valid anymore, the number of active species is not increased 
     //first step when DAC is used: check if some species should be "activated"
     //this avoid growing the EOA and then fail inEOA because one inactive species
     //is sligthly different from the stored one
+
     if(DAC_)
     {
         label activeAdded(0);
+//List<label> sAdded(spaceSize()-2);
         for (label i=0; i<spaceSize()-2; i++)
         {
             if(dphi[i]!=0.0 && completeToSimplifiedIndex(i)==-1 && i!=inertSpecie_)//if previously inactive but dphi!=0 and not inert
             {
-                NsDAC_++;
+		return false;
+/*                NsDAC_++;
                 simplifiedToCompleteIndex_.setSize(NsDAC_,i); //add the new active species
                 completeToSimplifiedIndex_[i]=NsDAC_-1;
+sAdded[activeAdded]=simplifiedToCompleteIndex_[NsDAC_-1];
                 activeAdded++;
+*/
             }
         }
-        
+/*if(activeAdded>0)
+{
+Info << "grow : dimensions included = " << activeAdded << endl;
+Info << "new dimension = " << NsDAC_ << endl;
+for(label i=0; i<activeAdded;i++)
+Info << chemistry_->Y()[sAdded[i]].name() << "   ";
+
+Info << endl;
+}
+*/
+
+//
+//new dimensions are not added anymore, a limited number should be tried in future versions
+//
         //update LT and A :
         //-add new column and line for the new active species
         //-transfer last two lines of the previous matrix (p and T) to the end (change the diagonal position)
@@ -451,6 +481,7 @@ void chemPointISAT<CompType, ThermoType>::grow(const scalarField& phiq)
     }
     
     qrUpdate(dim, u, v);
+    return true;
 }
 
 
@@ -789,66 +820,66 @@ void chemPointISAT<CompType, ThermoType>::svd(List<List<scalar> >& A, label m, l
             }
             if (its == 29)
             {
-                //FatalErrorIn("void Foam::chemistryOnlineLibrary::svd(scalarMatrix& A, label n, scalarField& d, scalarMatrix& V)")
-                //<< "No convergence in 30 iterations" << abort(FatalError);
-                Info << "No convergence in 30 iterations" << endl;
-            }
-            x = d[l];
-            nm = k-1;
-            y = d[nm];
-            g = rv1[nm];
-            h = rv1[k];
-            f = ((y-z)*(y+z)+(g-h)*(g+h))/(2.0*h*y);
-            g = pythag(f,1.0);
-            f = ((x-z)*(x+z)+h*((y/(f+sign(f)*g))-h))/x;
-            c=s=1.0; 
-            //Next QR transformation
-            for (j=l; j<=nm; j++)
-            {
-                i = j+1;
-                g = rv1[i];
-                y = d[i];
-                h = s*g;
-                g = c*g;
-                z = pythag(f,h);
-                rv1[j] = z;
-                c = f/z;
-                s = h/z;
-                f = x*c + g*s;
-                g = g*c - x*s;
-                h = y*s;
-                y *= c;
-                for (jj=0; jj<n; jj++)
-                {
-                    x = V[jj][j];
-                    z = V[jj][i];
-                    V[jj][j] = x*c + z*s;
-                    V[jj][i] = z*c - x*s;
-                }
-                z = pythag(f,h);
-                d[j] = z;
-                if (z)
-                {
-                    z = 1.0/z;
-                    c = f*z;
-                    s = h*z;
-                }
-                f = c*g + s*y;
-                x = c*y - s*g;
-                for (jj=0; jj<m; jj++)
-                {
-                    y = A[jj][j];
-                    z = A[jj][i];
-                    A[jj][j] = y*c + z*s;
-                    A[jj][i] = z*c - y*s;
-                }
-            }
-            rv1[l] = 0.0;
-            rv1[k] = f;
-            d[k] = x;
-        }
+		    //FatalErrorIn("void Foam::chemistryOnlineLibrary::svd(scalarMatrix& A, label n, scalarField& d, scalarMatrix& V)")
+		    //<< "No convergence in 30 iterations" << abort(FatalError);
+		    Info << "No convergence in 30 iterations" << endl;
+	    }
+	    x = d[l];
+	    nm = k-1;
+	    y = d[nm];
+	    g = rv1[nm];
+	    h = rv1[k];
+	    f = ((y-z)*(y+z)+(g-h)*(g+h))/(2.0*h*y);
+	    g = pythag(f,1.0);
+	    f = ((x-z)*(x+z)+h*((y/(f+sign(f)*g))-h))/x;
+	    c=s=1.0; 
+	    //Next QR transformation
+	    for (j=l; j<=nm; j++)
+	    {
+		    i = j+1;
+		    g = rv1[i];
+		    y = d[i];
+		    h = s*g;
+		    g = c*g;
+		    z = pythag(f,h);
+		    rv1[j] = z;
+		    c = f/z;
+		    s = h/z;
+		    f = x*c + g*s;
+		    g = g*c - x*s;
+		    h = y*s;
+		    y *= c;
+		    for (jj=0; jj<n; jj++)
+		    {
+			    x = V[jj][j];
+			    z = V[jj][i];
+			    V[jj][j] = x*c + z*s;
+			    V[jj][i] = z*c - x*s;
+		    }
+		    z = pythag(f,h);
+		    d[j] = z;
+		    if (z)
+		    {
+			    z = 1.0/z;
+			    c = f*z;
+			    s = h*z;
+		    }
+		    f = c*g + s*y;
+		    x = c*y - s*g;
+		    for (jj=0; jj<m; jj++)
+		    {
+			    y = A[jj][j];
+			    z = A[jj][i];
+			    A[jj][j] = y*c + z*s;
+			    A[jj][i] = z*c - y*s;
+		    }
+	    }
+	    rv1[l] = 0.0;
+	    rv1[k] = f;
+	    d[k] = x;
+	}
     }
-    
+
 }//end svd
 
 // pythag function used in svd
